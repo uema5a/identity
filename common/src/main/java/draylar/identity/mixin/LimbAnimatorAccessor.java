@@ -1,16 +1,16 @@
 package draylar.identity.mixin;
 
-import net.minecraft.entity.LimbAnimator;
+import net.minecraft.world.entity.WalkAnimationState;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 
-@Mixin(LimbAnimator.class)
+@Mixin(WalkAnimationState.class)
 public interface LimbAnimatorAccessor {
 
-    @Accessor
+    @Accessor("speedOld")
     float getPrevSpeed();
 
-    @Accessor
+    @Accessor("speedOld")
     void setPrevSpeed(float prevSpeed);
 
     @Accessor
@@ -19,9 +19,9 @@ public interface LimbAnimatorAccessor {
     @Accessor
     void setSpeed(float speed);
 
-    @Accessor
+    @Accessor("position")
     float getPos();
 
-    @Accessor
+    @Accessor("position")
     void setPos(float pos);
 }
