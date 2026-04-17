@@ -1,22 +1,21 @@
 package draylar.identity.api;
 
-import dev.architectury.event.EventResult;
 import draylar.identity.api.event.UnlockIdentityCallback;
 import draylar.identity.api.variant.IdentityType;
 import draylar.identity.impl.PlayerDataProvider;
 import draylar.identity.network.impl.UnlockPackets;
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.util.ActionResult;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.InteractionResult;
 
 public class PlayerUnlocks {
 
-    public static boolean unlock(ServerPlayerEntity player, IdentityType granted) {
+    public static boolean unlock(ServerPlayer player, IdentityType granted) {
         PlayerDataProvider provider = (PlayerDataProvider) player;
-        EventResult unlock = UnlockIdentityCallback.EVENT.invoker().unlock(player, granted);
+        InteractionResult unlock = UnlockIdentityCallback.EVENT.invoker().unlock(player, granted);
 
-        if(unlock.asMinecraft() != ActionResult.FAIL && !provider.getUnlocked().contains(granted)) {
+        if(unlock != InteractionResult.FAIL && !provider.getUnlocked().contains(granted)) {
             provider.getUnlocked().add(granted);
             sync(player);
             PlayerAbilities.sync(player); // TODO: ???
@@ -26,11 +25,11 @@ public class PlayerUnlocks {
         }
     }
 
-    public static boolean has(PlayerEntity player, IdentityType type) {
+    public static boolean has(Player player, IdentityType type) {
         return type.getEntityType().equals(EntityType.PLAYER) || (((PlayerDataProvider) player)).getUnlocked().contains(type);
     }
 
-    public static void revoke(ServerPlayerEntity player, IdentityType type) {
+    public static void revoke(ServerPlayer player, IdentityType type) {
         PlayerDataProvider provider = (PlayerDataProvider) player;
 
         if(provider.getUnlocked().contains(type)) {
@@ -40,7 +39,7 @@ public class PlayerUnlocks {
         }
     }
 
-    public static void sync(ServerPlayerEntity player) {
+    public static void sync(ServerPlayer player) {
         UnlockPackets.sendSyncPacket(player);
     }
 }

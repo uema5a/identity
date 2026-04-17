@@ -3,8 +3,8 @@ package draylar.identity.api;
 import draylar.identity.impl.tick.identity.FrogTickHandler;
 import draylar.identity.impl.tick.identity.JumpBoostTickHandler;
 import draylar.identity.impl.tick.identity.WardenTickHandler;
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.LivingEntity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
 
 import java.util.HashMap;
 import java.util.Map;

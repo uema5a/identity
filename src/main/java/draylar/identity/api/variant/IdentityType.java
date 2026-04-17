@@ -3,15 +3,15 @@ package draylar.identity.api.variant;
 import draylar.identity.Identity;
 import draylar.identity.impl.variant.*;
 import net.Gabou.gaboulibs.util.CompatUtils;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.registry.BuiltinRegistries;
-import net.minecraft.registry.Registries;
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
-import net.minecraft.world.World;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
@@ -37,7 +37,6 @@ public class IdentityType<T extends LivingEntity> {
         this.type = type;
         variantData = getDefaultVariantData(type);
     }
-
 
     private int getDefaultVariantData(EntityType<T> type) {
         if(VARIANT_BY_TYPE.containsKey(type)) {
@@ -80,22 +79,23 @@ public class IdentityType<T extends LivingEntity> {
     }
 
     @Nullable
-    public static IdentityType<?> from(NbtCompound compound) {
-        Identifier id = new Identifier(compound.getString("EntityID"));
-        if(!Registries.ENTITY_TYPE.containsId(id)) {
+    public static IdentityType<?> from(CompoundTag compound) {
+        String entityId = compound.getStringOr("EntityID", "");
+        if(entityId.isEmpty()) return null;
+        Identifier id = Identifier.parse(entityId);
+        if(!BuiltInRegistries.ENTITY_TYPE.containsKey(id)) {
             return null;
         }
 
-        return new IdentityType(Registries.ENTITY_TYPE.get(id), compound.contains("Variant") ? compound.getInt("Variant") : -1);
+        return new IdentityType(BuiltInRegistries.ENTITY_TYPE.getValue(id), compound.contains("Variant") ? compound.getIntOr("Variant", -1) : -1);
     }
 
-    public static List<IdentityType<?>> getAllTypes(World world) {
+    public static List<IdentityType<?>> getAllTypes(Level level) {
         if (LIVING_TYPE_CASH.isEmpty()) {
-            for (EntityType<?> type : Registries.ENTITY_TYPE) {
+            for (EntityType<?> type : BuiltInRegistries.ENTITY_TYPE) {
 
-                // Skip if already blacklisted
-
-                Identifier id = Registries.ENTITY_TYPE.getId(type);
+                // Skip if already blacklisted (xGabou: CompatUtils integration)
+                Identifier id = BuiltInRegistries.ENTITY_TYPE.getKey(type);
 
                 if (CompatUtils.isBlacklistedEntityType(id.toString())) {
                     continue;
@@ -103,7 +103,7 @@ public class IdentityType<T extends LivingEntity> {
 
                 try {
                     // Try to create an instance once for compatibility check
-                    Entity instance = type.create(world);
+                    Entity instance = type.create(level, EntitySpawnReason.COMMAND);
 
                     if (instance instanceof LivingEntity) {
                         // Cache only if safe
@@ -120,7 +120,7 @@ public class IdentityType<T extends LivingEntity> {
 
         List<IdentityType<?>> types = new ArrayList<>();
         for (EntityType<? extends LivingEntity> type : LIVING_TYPE_CASH) {
-            if (VARIANT_BY_TYPE.containsKey(type)) {
+            if(VARIANT_BY_TYPE.containsKey(type)) {
                 TypeProvider<?> variant = VARIANT_BY_TYPE.get(type);
                 for (int i = 0; i <= variant.getRange(); i++) {
                     types.add(new IdentityType<>((EntityType<LivingEntity>) type, i));
@@ -130,10 +130,8 @@ public class IdentityType<T extends LivingEntity> {
             }
         }
 
-
         return types;
     }
-
 
     @Nullable
     public static <Z extends LivingEntity> IdentityType<Z> from(EntityType<?> entityType, int variant) {
@@ -147,9 +145,9 @@ public class IdentityType<T extends LivingEntity> {
         return new IdentityType<>((EntityType<Z>) entityType, variant);
     }
 
-    public NbtCompound writeCompound() {
-        NbtCompound compound = new NbtCompound();
-        compound.putString("EntityID", Registries.ENTITY_TYPE.getId(type).toString());
+    public CompoundTag writeCompound() {
+        CompoundTag compound = new CompoundTag();
+        compound.putString("EntityID", BuiltInRegistries.ENTITY_TYPE.getKey(type).toString());
         compound.putInt("Variant", variantData);
         return compound;
     }
@@ -158,13 +156,13 @@ public class IdentityType<T extends LivingEntity> {
         return type;
     }
 
-    public T create(World world) {
+    public T create(Level level) {
         TypeProvider<T> typeProvider = (TypeProvider<T>) VARIANT_BY_TYPE.get(type);
         if(typeProvider != null) {
-            return typeProvider.create(type, world, variantData);
+            return typeProvider.create(type, level, variantData);
         }
 
-        return type.create(world);
+        return type.create(level, EntitySpawnReason.COMMAND);
     }
 
     public int getVariantData() {
@@ -184,23 +182,21 @@ public class IdentityType<T extends LivingEntity> {
         return Objects.hash(type, variantData);
     }
 
-    public void writeEntityNbt(NbtCompound tag) {
-        NbtCompound inner = writeCompound();
+    public void writeEntityNbt(CompoundTag tag) {
+        CompoundTag inner = writeCompound();
         tag.put("IdentityType", inner);
     }
 
-    public static IdentityType<?> fromEntityNbt(NbtCompound tag) {
-        return from(tag.getCompound("IdentityType"));
+    public static IdentityType<?> fromEntityNbt(CompoundTag tag) {
+        return tag.getCompound("IdentityType").map(IdentityType::from).orElse(null);
     }
 
-    public Text createTooltipText(T entity) {
+    public Component createTooltipText(T entity) {
         TypeProvider<T> provider = (TypeProvider<T>) VARIANT_BY_TYPE.get(type);
         if(provider != null) {
-            return provider.modifyText(entity, Text.translatable(type.getTranslationKey()));
+            return provider.modifyText(entity, Component.translatable(type.getDescriptionId()));
         }
 
-        return Text.translatable(type.getTranslationKey());
+        return Component.translatable(type.getDescriptionId());
     }
-
-
 }

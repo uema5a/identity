@@ -1,24 +1,23 @@
 package draylar.identity.api;
 
-import draylar.identity.api.platform.IdentityConfig;
+import draylar.identity.config.IdentityConfig;
 import draylar.identity.api.variant.IdentityType;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.registry.Registries;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.stat.Stats;
-import net.minecraft.text.Text;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.network.chat.Component;
 
 public class IdentityGranting {
 
-    public static void grantByAttack(PlayerEntity player, IdentityType<?> granted) {
-        if(player instanceof ServerPlayerEntity serverPlayerEntity) {
-            int amountKilled = serverPlayerEntity.getStatHandler().getStat(Stats.KILLED, granted.getEntityType());
+    public static void grantByAttack(Player player, IdentityType<?> granted) {
+        if(player instanceof ServerPlayer serverPlayerEntity) {
+            int amountKilled = serverPlayerEntity.getStats().getValue(net.minecraft.stats.Stats.ENTITY_KILLED.get(granted.getEntityType()));
 
             // If the player has to kill a certain number of mobs before unlocking an Identity, check their statistic for the specific type.
             if(IdentityConfig.getInstance().requiresKillsForIdentity()) {
-                String id = Registries.ENTITY_TYPE.getId(granted.getEntityType()).toString();
+                String id = BuiltInRegistries.ENTITY_TYPE.getKey(granted.getEntityType()).toString();
 
                 // Check against a specific count requirement or the default count.
                 int required = IdentityConfig.getInstance().getRequiredKillsForIdentity();
@@ -41,11 +40,11 @@ public class IdentityGranting {
 
                 // send unlock message to player if they aren't in creative and the config option is on
                 if(IdentityConfig.getInstance().shouldOverlayIdentityUnlocks() && !player.isCreative()) {
-                    player.sendMessage(
-                            Text.translatable(
+                    player.sendOverlayMessage(
+                            Component.translatable(
                                     "identity.unlock_entity",
-                                    Text.translatable(granted.getEntityType().getTranslationKey())
-                            ), true
+                                    Component.translatable(granted.getEntityType().getDescriptionId())
+                            )
                     );
                 }
 
@@ -53,7 +52,7 @@ public class IdentityGranting {
             }
 
             // force-morph player into new type
-            Entity instanced = granted.create(player.getWorld());
+            Entity instanced = granted.create(player.level());
             if(instanced instanceof LivingEntity) {
                 if(IdentityConfig.getInstance().forceChangeNew() && isNew) {
                     PlayerIdentity.updateIdentity(serverPlayerEntity, granted, (LivingEntity) instanced);

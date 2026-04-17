@@ -1,17 +1,12 @@
 package draylar.identity.api.model;
 
-import draylar.identity.impl.NearbySongAccessor;
-import draylar.identity.mixin.accessor.CreeperEntityAccessor;
-import draylar.identity.mixin.accessor.ParrotEntityAccessor;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.minecraft.client.render.VertexConsumerProvider;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.item.BlockItem;
-import net.minecraft.item.ItemStack;
+import net.minecraft.client.renderer.MultiBufferSource;
+import com.mojang.blaze3d.vertex.PoseStack;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -21,7 +16,7 @@ import java.util.Map;
  *
  * <p>{@link EntityUpdater}s are used to apply changes to identity entity instances on the client using information from the player.
  * As an example, an {@link EntityUpdater} can be used to tell a identity bat to "stop roosting," which triggers the flight animation.
- * {@link EntityUpdater}s are called once every render tick {@link net.minecraft.client.render.entity.EntityRenderer#render(Entity, float, float, MatrixStack, VertexConsumerProvider, int)}.
+ * {@link EntityUpdater}s are called once every render tick {@link net.minecraft.client.renderer.entity.EntityRenderer#render(Entity, float, float, PoseStack, MultiBufferSource, int)}.
  */
 @Environment(EnvType.CLIENT)
 public class EntityUpdaters {
@@ -57,73 +52,10 @@ public class EntityUpdaters {
     }
 
     public static void init() {
-        // register specific entity animation handling
-        EntityUpdaters.register(EntityType.BAT, (player, bat) -> {
-            if (player.isOnGround()) {
-                bat.setRoosting(true);
-            } else {
-                bat.setRoosting(false);
-            }
-        });
-
-        EntityUpdaters.register(EntityType.PARROT, (player, parrot) -> {
-            if (player.isOnGround() && ((NearbySongAccessor) player).identity_isNearbySongPlaying()) {
-                parrot.setNearbySongPlaying(player.getBlockPos(), true);
-                parrot.setSitting(true);
-                parrot.setOnGround(true);
-            } else if (player.isOnGround()) {
-                parrot.setNearbySongPlaying(player.getBlockPos(), false);
-                parrot.setSitting(true);
-                parrot.setOnGround(true);
-                parrot.prevFlapProgress = 0;
-                parrot.flapProgress = 0;
-                parrot.maxWingDeviation = 0;
-                parrot.prevMaxWingDeviation = 0;
-            } else {
-                parrot.setNearbySongPlaying(player.getBlockPos(), false);
-                parrot.setSitting(false);
-                parrot.setOnGround(false);
-                parrot.setInSittingPose(false);
-                ((ParrotEntityAccessor) parrot).callFlapWings();
-            }
-        });
-
-
-
-        EntityUpdaters.register(EntityType.ENDER_DRAGON, (player, dragon) -> {
-            dragon.wingPosition += 0.01F;
-            dragon.prevWingPosition = dragon.wingPosition;
-
-            // setting yaw without +180 making tail faces front, for some reason
-            if (dragon.latestSegment < 0) {
-                for (int l = 0; l < dragon.segmentCircularBuffer.length; ++l) {
-                    dragon.segmentCircularBuffer[l][0] = (double) player.getYaw() + 180;
-                    dragon.segmentCircularBuffer[l][1] = player.getY();
-                }
-            }
-
-            if (++(dragon).latestSegment == (dragon).segmentCircularBuffer.length) {
-                (dragon).latestSegment = 0;
-            }
-
-            dragon.segmentCircularBuffer[dragon.latestSegment][0] = (double) player.getYaw() + 180;
-            dragon.segmentCircularBuffer[dragon.latestSegment][1] = player.getY();
-        });
-
-        EntityUpdaters.register(EntityType.ENDERMAN, (player, enderman) -> {
-            ItemStack heldStack = player.getMainHandStack();
-
-            if (heldStack.getItem() instanceof BlockItem) {
-                enderman.setCarriedBlock(((BlockItem) heldStack.getItem()).getBlock().getDefaultState());
-            }
-        });
-
-        // To prevent Creeper Identities from flickering white, we reset currentFuseTime to 0.
-        // Creepers normally tick their fuse timer in tick(), but:
-        //    1. Identities do not tick
-        //    2. The Creeper ability is instant, so we do not need to re-implement ticking
-        EntityUpdaters.register(EntityType.CREEPER, (player, creeper) -> {
-            ((CreeperEntityAccessor) creeper).setCurrentFuseTime(0);
-        });
+        // TODO: Phase 5 - Rewrite entity updater registrations for MC 26.1
+        // Many field names and methods changed (Yarn -> Mojang):
+        // - setRoosting, prevFlapProgress, flapProgress, wingPosition, segmentCircularBuffer, etc.
+        // - getMainHandItem -> getMainHandItem, getDefaultState -> defaultBlockState
+        // Original registrations: BAT, PARROT, ENDER_DRAGON, ENDERMAN, CREEPER
     }
 }
