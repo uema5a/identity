@@ -3,60 +3,64 @@ package draylar.identity.ability.impl;
 import draylar.identity.ability.IdentityAbility;
 import draylar.identity.impl.PlayerDataProvider;
 import draylar.identity.network.impl.VillagerProfessionPackets;
-import net.minecraft.entity.passive.VillagerEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.Item;
-import net.minecraft.item.Items;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.entry.RegistryEntry;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.util.Identifier;
-import net.minecraft.text.Text;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.hit.HitResult;
-import net.minecraft.world.World;
-import net.minecraft.world.poi.PointOfInterestType;
-import net.minecraft.world.poi.PointOfInterestTypes;
-import net.minecraft.village.VillagerProfession;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.ai.village.poi.PoiType;
+import net.minecraft.world.entity.ai.village.poi.PoiTypes;
+import net.minecraft.world.entity.npc.Villager;
+import net.minecraft.world.entity.npc.VillagerProfession;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.core.Holder;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Predicate;
-import java.lang.reflect.Method;
-import java.lang.reflect.InvocationTargetException;
-import java.util.Map;
 
-public class VillagerProfessionAbility extends IdentityAbility<VillagerEntity> {
+public class VillagerProfessionAbility extends IdentityAbility<Villager> {
 
     @Override
-    public void onUse(PlayerEntity player, VillagerEntity identity, World world) {
-        if (world.isClient) {
+    public void onUse(Player player, Villager identity, Level level) {
+        if (level.isClientSide) {
             return;
         }
 
-        if (!player.isSneaking()) {
-            ((ServerPlayerEntity) player).sendMessage(Text.translatable("identity.profession.must_sneak"), true);
+        if (!player.isShiftKeyDown()) {
+            ((ServerPlayer) player).sendSystemMessage(Component.translatable("identity.profession.must_sneak"), true);
             return;
         }
 
-        HitResult result = player.raycast(5.0, 0.0F, false);
+        HitResult result = player.pick(5.0, 0.0F, false);
         if (result.getType() != HitResult.Type.BLOCK) {
             return;
         }
 
         BlockHitResult blockResult = (BlockHitResult) result;
-        Optional<RegistryEntry<PointOfInterestType>> poi = PointOfInterestTypes.getTypeForState(world.getBlockState(blockResult.getBlockPos()));
+        // TODO Phase C: verify PoiTypes.forState method name in MC 26.1 (was PointOfInterestTypes.getTypeForState in 1.20.1)
+        Optional<Holder<PoiType>> poi = PoiTypes.forState(level.getBlockState(blockResult.getBlockPos()));
         if (poi.isPresent()) {
-            RegistryEntry<PointOfInterestType> targetPoi = poi.get();
+            Holder<PoiType> targetPoi = poi.get();
 
-            Identifier poiId = Registries.POINT_OF_INTEREST_TYPE.getId(targetPoi.value());
-            Identifier worldId = player.getWorld().getRegistryKey().getValue();
-            Map<String, net.minecraft.nbt.NbtCompound> villagerMap = ((PlayerDataProvider) player).getVillagerIdentities();
+            var poiKey = BuiltInRegistries.POINT_OF_INTEREST_TYPE.getKey(targetPoi.value());
+            Identifier poiId = poiKey != null ? poiKey.location() : null;
+            Identifier worldId = player.level().dimension().location();
+            // TODO Phase C: PlayerDataProvider.getVillagerIdentities() will be migrated by B3 from NbtCompound to CompoundTag
+            Map<String, CompoundTag> villagerMap = ((PlayerDataProvider) player).getVillagerIdentities();
             String existingName = null;
             String existingProfession = null;
             long workstationPos = blockResult.getBlockPos().asLong();
 
-            for (Map.Entry<String, net.minecraft.nbt.NbtCompound> entry : villagerMap.entrySet()) {
-                net.minecraft.nbt.NbtCompound saved = entry.getValue();
+            for (Map.Entry<String, CompoundTag> entry : villagerMap.entrySet()) {
+                CompoundTag saved = entry.getValue();
                 if (matchesWorkstation(saved, worldId, workstationPos)) {
                     existingName = entry.getKey();
                     existingProfession = saved.getString("ProfessionId");
@@ -64,11 +68,12 @@ public class VillagerProfessionAbility extends IdentityAbility<VillagerEntity> {
                 }
             }
 
-            for (VillagerProfession profession : Registries.VILLAGER_PROFESSION) {
+            for (VillagerProfession profession : BuiltInRegistries.VILLAGER_PROFESSION) {
                 boolean matches = false;
 
                 // 1) Simple ID match: many mappings name POI types after the profession (e.g., minecraft:librarian)
-                Identifier profIdDirect = Registries.VILLAGER_PROFESSION.getId(profession);
+                var profKey = BuiltInRegistries.VILLAGER_PROFESSION.getKey(profession);
+                Identifier profIdDirect = profKey != null ? profKey.location() : null;
                 if (poiId != null && poiId.equals(profIdDirect)) {
                     matches = true;
                 }
@@ -76,7 +81,7 @@ public class VillagerProfessionAbility extends IdentityAbility<VillagerEntity> {
                 try {
                     Method held = VillagerProfession.class.getMethod("heldWorkstation");
                     Object value = held.invoke(profession);
-                    if (!matches && value instanceof RegistryEntry<?> entry) {
+                    if (!matches && value instanceof Holder<?> entry) {
                         matches = entry.equals(targetPoi);
                     }
                 } catch (NoSuchMethodException e) {
@@ -85,7 +90,7 @@ public class VillagerProfessionAbility extends IdentityAbility<VillagerEntity> {
                         Object predicate = acquirable.invoke(profession);
                         if (!matches && predicate instanceof Predicate<?> raw) {
                             @SuppressWarnings("unchecked")
-                            Predicate<RegistryEntry<PointOfInterestType>> p = (Predicate<RegistryEntry<PointOfInterestType>>) raw;
+                            Predicate<Holder<PoiType>> p = (Predicate<Holder<PoiType>>) raw;
                             matches = p.test(targetPoi);
                         }
                     } catch (NoSuchMethodException ignored) {
@@ -94,7 +99,7 @@ public class VillagerProfessionAbility extends IdentityAbility<VillagerEntity> {
                             Object predicate = acquirable.invoke(profession);
                             if (!matches && predicate instanceof Predicate<?> raw) {
                                 @SuppressWarnings("unchecked")
-                                Predicate<RegistryEntry<PointOfInterestType>> p = (Predicate<RegistryEntry<PointOfInterestType>>) raw;
+                                Predicate<Holder<PoiType>> p = (Predicate<Holder<PoiType>>) raw;
                                 matches = p.test(targetPoi);
                             }
                         } catch (NoSuchMethodException ignoredToo) {
@@ -110,13 +115,13 @@ public class VillagerProfessionAbility extends IdentityAbility<VillagerEntity> {
                 }
 
                 if (matches) {
-                    Identifier profId = Registries.VILLAGER_PROFESSION.getId(profession);
-                    VillagerProfessionPackets.openScreen((ServerPlayerEntity) player, profId, blockResult.getBlockPos(), worldId, existingName, existingProfession);
+                    // TODO Phase C: VillagerProfessionPackets.openScreen signature migrated by B8 worker (ServerPlayer, Identifier, BlockPos, Identifier, String, String)
+                    VillagerProfessionPackets.openScreen((ServerPlayer) player, profIdDirect, blockResult.getBlockPos(), worldId, existingName, existingProfession);
                     break;
                 }
             }
         } else {
-            ((ServerPlayerEntity) player).sendMessage(Text.translatable("identity.profession.invalid_workstation"), true);
+            ((ServerPlayer) player).sendSystemMessage(Component.translatable("identity.profession.invalid_workstation"), true);
         }
     }
 
@@ -125,7 +130,7 @@ public class VillagerProfessionAbility extends IdentityAbility<VillagerEntity> {
         return Items.EMERALD;
     }
 
-    private boolean matchesWorkstation(net.minecraft.nbt.NbtCompound tag, Identifier worldId, long workstationPos) {
+    private boolean matchesWorkstation(CompoundTag tag, Identifier worldId, long workstationPos) {
         if (tag == null) {
             return false;
         }

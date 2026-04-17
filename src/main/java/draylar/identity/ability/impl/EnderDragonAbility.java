@@ -1,45 +1,43 @@
 package draylar.identity.ability.impl;
 
 import draylar.identity.ability.IdentityAbility;
-import net.minecraft.entity.boss.dragon.EnderDragonEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.entity.projectile.DragonFireballEntity;
-import net.minecraft.item.Item;
-import net.minecraft.item.Items;
-import net.minecraft.sound.SoundCategory;
-import net.minecraft.sound.SoundEvents;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.World;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.projectile.hurtingprojectile.DragonFireball;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.Vec3;
 
-public class EnderDragonAbility extends IdentityAbility<EnderDragonEntity> {
+public class EnderDragonAbility extends IdentityAbility<EnderDragon> {
 
     @Override
-    public void onUse(PlayerEntity player, EnderDragonEntity identity, World world) {
-        if (!world.isClient) {
-            Vec3d look = player.getRotationVec(1.0F);
-            Vec3d velocity = look.multiply(0.5); // control speed
-            Vec3d spawnPos = player.getEyePos().add(look.multiply(2.0)); // mouth-level offset
+    public void onUse(Player player, EnderDragon identity, Level level) {
+        if (!level.isClientSide) {
+            Vec3 look = player.getLookAngle();
+            Vec3 velocity = look.scale(0.5); // control speed
+            Vec3 spawnPos = player.getEyePosition().add(look.scale(2.0)); // mouth-level offset
 
-            DragonFireballEntity dragonFireball = new DragonFireballEntity(world, player, velocity.x, velocity.y, velocity.z);
+            DragonFireball dragonFireball = new DragonFireball(level, player, velocity);
 
-            // Manually move fireball to spawn in front of the player’s head
-            dragonFireball.refreshPositionAndAngles(spawnPos.x, spawnPos.y, spawnPos.z, player.getYaw(), player.getPitch());
+            // Manually move fireball to spawn in front of the player's head
+            dragonFireball.moveTo(spawnPos.x, spawnPos.y, spawnPos.z, player.getYRot(), player.getXRot());
             dragonFireball.setOwner(player);
 
-            world.spawnEntity(dragonFireball);
+            level.addFreshEntity(dragonFireball);
 
-            world.playSoundFromEntity(
+            level.playSound(
                     null,
                     player,
-                    SoundEvents.ENTITY_ENDER_DRAGON_SHOOT,
-                    SoundCategory.HOSTILE,
+                    SoundEvents.ENDER_DRAGON_SHOOT,
+                    SoundSource.HOSTILE,
                     3.0F,
                     1.0F
             );
         }
     }
-
-
 
     @Override
     public Item getIcon() {

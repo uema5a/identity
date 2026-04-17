@@ -2,16 +2,16 @@ package draylar.identity.ability.impl;
 
 import draylar.identity.ability.IdentityAbility;
 import draylar.identity.impl.SonicBoomUser;
-import net.minecraft.entity.mob.WardenEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.Item;
-import net.minecraft.item.Items;
-import net.minecraft.world.World;
+import net.minecraft.world.entity.monster.warden.Warden;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.level.Level;
 
-public class WardenAbility extends IdentityAbility<WardenEntity> {
+public class WardenAbility extends IdentityAbility<Warden> {
 
     @Override
-    public void onUse(PlayerEntity player, WardenEntity identity, World world) {
+    public void onUse(Player player, Warden identity, Level level) {
         ((SonicBoomUser) player).identity$ability_startSonicBoom();
     }
 
@@ -21,7 +21,7 @@ public class WardenAbility extends IdentityAbility<WardenEntity> {
     }
 
     @Override
-    public int getCooldown(WardenEntity entity) {
+    public int getCooldown(Warden entity) {
         return 20 * 10;
     }
 }

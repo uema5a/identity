@@ -1,18 +1,18 @@
 package draylar.identity.ability.impl;
 
 import draylar.identity.ability.IdentityAbility;
-import net.minecraft.entity.mob.CreeperEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.Item;
-import net.minecraft.item.Items;
-import net.minecraft.world.World;
+import net.minecraft.world.entity.monster.Creeper;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.level.Level;
 
-public class CreeperAbility extends IdentityAbility<CreeperEntity> {
+public class CreeperAbility extends IdentityAbility<Creeper> {
 
     @Override
-    public void onUse(PlayerEntity player, CreeperEntity identity, World world) {
-        float power = identity.shouldRenderOverlay() ? 6.0f : 3.0f;
-        world.createExplosion(player, player.getX(), player.getY(), player.getZ(), power, World.ExplosionSourceType.NONE);
+    public void onUse(Player player, Creeper identity, Level level) {
+        float power = identity.isPowered() ? 6.0f : 3.0f;
+        level.explode(player, player.getX(), player.getY(), player.getZ(), power, Level.ExplosionInteraction.NONE);
     }
 
     @Override
