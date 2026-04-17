@@ -2,15 +2,15 @@ package draylar.identity.mixin;
 
 import draylar.identity.api.PlayerHostility;
 import draylar.identity.api.PlayerIdentity;
-import draylar.identity.api.platform.IdentityConfig;
-import net.minecraft.entity.EntityGroup;
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.ai.goal.ActiveTargetGoal;
-import net.minecraft.entity.boss.WitherEntity;
-import net.minecraft.entity.mob.CreeperEntity;
-import net.minecraft.entity.mob.Monster;
-import net.minecraft.entity.player.PlayerEntity;
+import draylar.identity.config.IdentityConfig;
+// MobType was removed in MC 26.1
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.goal.target.NearestAttackableTargetGoal;
+import net.minecraft.world.entity.boss.wither.WitherBoss;
+import net.minecraft.world.entity.monster.Creeper;
+import net.minecraft.world.entity.monster.Monster;
+import net.minecraft.world.entity.player.Player;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
@@ -18,10 +18,10 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-@Mixin(ActiveTargetGoal.class)
+@Mixin(NearestAttackableTargetGoal.class)
 public abstract class ActiveTargetGoalMixin extends TrackTargetGoalMixin {
 
-    @Shadow protected LivingEntity targetEntity;
+    @Shadow protected LivingEntity target;
 
     @Inject(
             method = "start",
@@ -29,8 +29,8 @@ public abstract class ActiveTargetGoalMixin extends TrackTargetGoalMixin {
             cancellable = true
     )
     private void ignoreMorphedPlayers(CallbackInfo ci) {
-        if (IdentityConfig.getInstance().hostilesIgnoreHostileIdentityPlayer() && this.mob instanceof Monster && this.targetEntity instanceof PlayerEntity) {
-            PlayerEntity player = (PlayerEntity) this.targetEntity;
+        if (IdentityConfig.getInstance().hostilesIgnoreHostileIdentityPlayer() && this.mob instanceof Monster && this.target instanceof Player) {
+            Player player = (Player) this.target;
             LivingEntity identity = PlayerIdentity.getIdentity(player);
 
             if(identity != null) {
@@ -39,19 +39,19 @@ public abstract class ActiveTargetGoalMixin extends TrackTargetGoalMixin {
                 // only cancel if the player does not have hostility
                 if (!hasHostility) {
                     // creepers should ignore cats
-                    if (this.mob instanceof CreeperEntity && identity.getType().equals(EntityType.OCELOT)) {
+                    if (this.mob instanceof Creeper && identity.getType().equals(EntityType.OCELOT)) {
                         this.stop();
                         ci.cancel();
                     }
 
                     // withers should ignore undead
-                    else if (this.mob instanceof WitherEntity && identity.getGroup().equals(EntityGroup.UNDEAD)) {
+                    else if (this.mob instanceof WitherBoss && identity.isInvertedHealAndHarm()) {
                         this.stop();
                         ci.cancel();
                     }
 
                     // hostile mobs (besides wither) should not target players morphed as hostile mobs
-                    else if (!(this.mob instanceof WitherEntity) && identity instanceof Monster) {
+                    else if (!(this.mob instanceof WitherBoss) && identity instanceof Monster) {
                         this.stop();
                         ci.cancel();
                     }
@@ -63,7 +63,7 @@ public abstract class ActiveTargetGoalMixin extends TrackTargetGoalMixin {
     @Override
     protected void identity_shouldContinue(CallbackInfoReturnable<Boolean> cir) {
         // check cancelling for hostiles
-        if(IdentityConfig.getInstance().hostilesIgnoreHostileIdentityPlayer() && IdentityConfig.getInstance().hostilesForgetNewHostileIdentityPlayer() && this.mob instanceof Monster && this.targetEntity instanceof PlayerEntity player) {
+        if(IdentityConfig.getInstance().hostilesIgnoreHostileIdentityPlayer() && IdentityConfig.getInstance().hostilesForgetNewHostileIdentityPlayer() && this.mob instanceof Monster && this.target instanceof Player player) {
             LivingEntity identity = PlayerIdentity.getIdentity(player);
 
             if (identity != null) {
@@ -72,17 +72,17 @@ public abstract class ActiveTargetGoalMixin extends TrackTargetGoalMixin {
                 // only cancel if the player does not have hostility
                 if (!hasHostility) {
                     // creepers should ignore cats
-                    if (this.mob instanceof CreeperEntity && identity.getType().equals(EntityType.OCELOT)) {
+                    if (this.mob instanceof Creeper && identity.getType().equals(EntityType.OCELOT)) {
                         cir.setReturnValue(false);
                     }
 
                     // withers should ignore undead
-                    else if (this.mob instanceof WitherEntity && identity.getGroup().equals(EntityGroup.UNDEAD)) {
+                    else if (this.mob instanceof WitherBoss && identity.isInvertedHealAndHarm()) {
                         cir.setReturnValue(false);
                     }
 
                     // hostile mobs (besides wither) should not target players morphed as hostile mobs
-                    else if (!(this.mob instanceof WitherEntity) && identity instanceof Monster) {
+                    else if (!(this.mob instanceof WitherBoss) && identity instanceof Monster) {
                         cir.setReturnValue(false);
                     }
                 }
