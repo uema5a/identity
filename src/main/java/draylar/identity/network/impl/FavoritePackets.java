@@ -1,19 +1,18 @@
 package draylar.identity.network.impl;
 
-import dev.architectury.networking.NetworkManager;
 import draylar.identity.api.PlayerFavorites;
 import draylar.identity.api.variant.IdentityType;
 import draylar.identity.impl.PlayerDataProvider;
-import draylar.identity.network.ClientNetworking;
-import draylar.identity.network.NetworkHandler;
-import io.netty.buffer.Unpooled;
-import net.minecraft.entity.EntityType;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.nbt.NbtElement;
-import net.minecraft.nbt.NbtList;
-import net.minecraft.network.PacketByteBuf;
-import net.minecraft.registry.Registries;
-import net.minecraft.server.network.ServerPlayerEntity;
+import draylar.identity.network.NetworkHandler.FavoriteSyncPayload;
+import draylar.identity.network.NetworkHandler.FavoriteUpdatePayload;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.EntityType;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Set;
@@ -21,25 +20,24 @@ import java.util.Set;
 public class FavoritePackets {
 
     public static void sendFavoriteRequest(IdentityType<?> type, boolean favorite) {
-        PacketByteBuf packet = new PacketByteBuf(Unpooled.buffer());
-        packet.writeIdentifier(Registries.ENTITY_TYPE.getId(type.getEntityType()));
-        packet.writeInt(type.getVariantData());
-        packet.writeBoolean(favorite);
-        NetworkManager.sendToServer(ClientNetworking.FAVORITE_UPDATE, packet);
+        String entityTypeId = BuiltInRegistries.ENTITY_TYPE.getKey(type.getEntityType()).toString();
+        ClientPlayNetworking.send(new FavoriteUpdatePayload(entityTypeId, type.getVariantData(), favorite));
     }
 
     public static void registerFavoriteRequestHandler() {
-        NetworkManager.registerReceiver(NetworkManager.Side.C2S, NetworkHandler.FAVORITE_UPDATE, (buf, context) -> {
-            EntityType<?> entityType = Registries.ENTITY_TYPE.get(buf.readIdentifier());
-            int variant = buf.readInt();
-            boolean favorite = buf.readBoolean();
-            ServerPlayerEntity player = (ServerPlayerEntity) context.getPlayer();
+        ServerPlayNetworking.registerGlobalReceiver(FavoriteUpdatePayload.TYPE, (payload, context) -> {
+            ServerPlayer player = context.player();
 
-            context.getPlayer().getServer().execute(() -> {
+            context.server().execute(() -> {
+                Identifier entityId = Identifier.parse(payload.entityTypeId());
+                EntityType<?> entityType = BuiltInRegistries.ENTITY_TYPE.getValue(entityId);
+                int variant = payload.variant();
+                boolean favorite = payload.favorite();
+
                 @Nullable IdentityType<?> type = IdentityType.from(entityType, variant);
 
-                if(type != null) {
-                    if(favorite) {
+                if (type != null) {
+                    if (favorite) {
                         PlayerFavorites.favorite(player, type);
                     } else {
                         PlayerFavorites.unfavorite(player, type);
@@ -49,27 +47,13 @@ public class FavoritePackets {
         });
     }
 
-    public static void sendFavoriteSync(ServerPlayerEntity player) {
+    public static void sendFavoriteSync(ServerPlayer player) {
         Set<IdentityType<?>> favorites = ((PlayerDataProvider) player).getFavorites();
-        NbtCompound tag = new NbtCompound();
-        NbtList idList = new NbtList();
+        CompoundTag tag = new CompoundTag();
+        ListTag idList = new ListTag();
         favorites.forEach(type -> idList.add(type.writeCompound()));
         tag.put("FavoriteIdentities", idList);
 
-        // Create & send packet with NBT
-        PacketByteBuf packet = new PacketByteBuf(Unpooled.buffer());
-        packet.writeNbt(tag);
-        NetworkManager.sendToPlayer(player, NetworkHandler.FAVORITE_SYNC, packet);
-    }
-
-    public static void handleFavoriteSyncPacket(PacketByteBuf packet, NetworkManager.PacketContext context) {
-        NbtCompound tag = packet.readNbt();
-
-        ClientNetworking.runOrQueue(context, player -> {
-            PlayerDataProvider data = (PlayerDataProvider) player;
-            data.getFavorites().clear();
-            NbtList idList = tag.getList("FavoriteIdentities", NbtElement.COMPOUND_TYPE);
-            idList.forEach(compound -> data.getFavorites().add(IdentityType.from((NbtCompound) compound)));
-        });
+        ServerPlayNetworking.send(player, new FavoriteSyncPayload(tag));
     }
 }

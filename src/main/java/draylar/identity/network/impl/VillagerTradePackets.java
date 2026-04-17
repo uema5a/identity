@@ -1,39 +1,38 @@
 package draylar.identity.network.impl;
 
-import dev.architectury.networking.NetworkManager;
 import draylar.identity.api.PlayerIdentity;
-import draylar.identity.network.NetworkHandler;
-import io.netty.buffer.Unpooled;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.passive.VillagerEntity;
-import net.minecraft.network.PacketByteBuf;
-import net.minecraft.server.network.ServerPlayerEntity;
+import draylar.identity.config.IdentityConfig;
+import draylar.identity.network.NetworkHandler.TradeSyncPayload;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.npc.Villager;
 
 import java.util.UUID;
 
 public class VillagerTradePackets {
 
     public static void sendTradeRequest(UUID target) {
-        PacketByteBuf packet = new PacketByteBuf(Unpooled.buffer());
-        packet.writeUuid(target);
-        NetworkManager.sendToServer(NetworkHandler.START_TRADE, packet);
+        ClientPlayNetworking.send(new TradeSyncPayload(target));
     }
 
     public static void registerTradeRequestHandler() {
-        NetworkManager.registerReceiver(NetworkManager.Side.C2S, NetworkHandler.START_TRADE, (buf, context) -> {
-            UUID targetId = buf.readUuid();
-            ServerPlayerEntity requester = (ServerPlayerEntity) context.getPlayer();
-            context.getPlayer().getServer().execute(() -> {
-                ServerPlayerEntity target = requester.getServer().getPlayerManager().getPlayer(targetId);
+        ServerPlayNetworking.registerGlobalReceiver(TradeSyncPayload.TYPE, (payload, context) -> {
+            UUID targetId = payload.target();
+            ServerPlayer requester = context.player();
+            context.server().execute(() -> {
+                ServerPlayer target = requester.server.getPlayerList().getPlayer(targetId);
                 if (target != null) {
                     LivingEntity identity = PlayerIdentity.getIdentity(target);
-                    if (identity instanceof VillagerEntity villager) {
+                    if (identity instanceof Villager villager) {
                         // Block self-trading unless enabled
-                        if (requester.getUuid().equals(target.getUuid()) && !draylar.identity.api.platform.IdentityConfig.getInstance().allowSelfTrading()) {
+                        if (requester.getUUID().equals(target.getUUID()) && !IdentityConfig.getInstance().allowSelfTrading()) {
                             return;
                         }
                         // Interact with the villager identity to open the trade screen
-                        villager.interactMob(requester, net.minecraft.util.Hand.MAIN_HAND);
+                        villager.interact(requester, InteractionHand.MAIN_HAND);
                     }
                 }
             });
