@@ -2,22 +2,22 @@ package draylar.identity.impl.variant;
 
 import draylar.identity.api.variant.TypeProvider;
 import draylar.identity.mixin.accessor.SlimeEntityAccessor;
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.mob.SlimeEntity;
-import net.minecraft.text.MutableText;
-import net.minecraft.text.Text;
-import net.minecraft.world.World;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.monster.Slime;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.level.Level;
 
-public class SlimeTypeProvider extends TypeProvider<SlimeEntity> {
+public class SlimeTypeProvider extends TypeProvider<Slime> {
 
     @Override
-    public int getVariantData(SlimeEntity entity) {
+    public int getVariantData(Slime entity) {
         return entity.getSize();
     }
 
     @Override
-    public SlimeEntity create(EntityType<SlimeEntity> type, World world, int data) {
-        SlimeEntity slime = new SlimeEntity(type, world);
+    public Slime create(EntityType<Slime> type, Level level, int data) {
+        Slime slime = new Slime(type, level);
         ((SlimeEntityAccessor) slime).callSetSize(data + 1, true);
         return slime;
     }
@@ -33,7 +33,7 @@ public class SlimeTypeProvider extends TypeProvider<SlimeEntity> {
     }
 
     @Override
-    public Text modifyText(SlimeEntity entity, MutableText text) {
-        return Text.literal(String.format("Size %d ", entity.getSize())).append(text);
+    public Component modifyText(Slime entity, MutableComponent text) {
+        return Component.literal(String.format("Size %d ", entity.getSize())).append(text);
     }
 }

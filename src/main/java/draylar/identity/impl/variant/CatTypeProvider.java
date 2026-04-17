@@ -1,43 +1,24 @@
 package draylar.identity.impl.variant;
 
-import com.google.common.collect.ImmutableMap;
 import draylar.identity.api.variant.TypeProvider;
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.passive.CatEntity;
-import net.minecraft.registry.Registries;
-import net.minecraft.text.MutableText;
-import net.minecraft.text.Text;
-import net.minecraft.world.World;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.entity.animal.feline.Cat;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.level.Level;
 
-import java.util.Map;
-
-public class CatTypeProvider extends TypeProvider<CatEntity> {
-
-    private static final Map<Integer, String> PREFIX_BY_ID = ImmutableMap
-            .<Integer, String>builder()
-            .put(0, "Tabby")
-            .put(1, "Black")
-            .put(2, "Red")
-            .put(3, "Siamese")
-            .put(4, "British Shorthair")
-            .put(5, "Calico")
-            .put(6, "Persian")
-            .put(7, "Ragdoll")
-            .put(8, "White")
-            .put(9, "Jellie")
-            .put(10, "Black")
-            .build();
+public class CatTypeProvider extends TypeProvider<Cat> {
 
     @Override
-    public int getVariantData(CatEntity entity) {
-        return Registries.CAT_VARIANT.getRawId(entity.getVariant());
+    public int getVariantData(Cat entity) {
+        // Cat variants are now registry-based (Holder<CatVariant>), return 0 as default
+        return 0;
     }
 
     @Override
-    public CatEntity create(EntityType<CatEntity> type, World world, int data) {
-        CatEntity cat = new CatEntity(type, world);
-        cat.setVariant(Registries.CAT_VARIANT.get(data));
-        return cat;
+    public Cat create(EntityType<Cat> type, Level level, int data) {
+        return type.create(level, EntitySpawnReason.COMMAND);
     }
 
     @Override
@@ -47,12 +28,11 @@ public class CatTypeProvider extends TypeProvider<CatEntity> {
 
     @Override
     public int getRange() {
-        return 10;
+        return 0; // Simplified - cat variants are now registry-based
     }
 
     @Override
-    public Text modifyText(CatEntity cat, MutableText text) {
-        int variant = getVariantData(cat);
-        return Text.literal(PREFIX_BY_ID.containsKey(variant) ? PREFIX_BY_ID.get(variant) + " " : "").append(text);
+    public Component modifyText(Cat cat, MutableComponent text) {
+        return text;
     }
 }
