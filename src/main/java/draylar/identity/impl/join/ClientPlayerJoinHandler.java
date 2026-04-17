@@ -1,14 +1,14 @@
 package draylar.identity.impl.join;
 
-import dev.architectury.event.events.client.ClientPlayerEvent;
 import draylar.identity.IdentityClient;
 import draylar.identity.api.ApplicablePacket;
-import net.minecraft.client.network.ClientPlayerEntity;
+import net.minecraft.client.player.LocalPlayer;
 
-public class ClientPlayerJoinHandler implements ClientPlayerEvent.ClientPlayerJoin {
+public class ClientPlayerJoinHandler {
 
-    @Override
-    public void join(ClientPlayerEntity player) {
+    public void onPlayerJoin(LocalPlayer player) {
+        if(player == null) return;
+
         for (ApplicablePacket packet : IdentityClient.getSyncPacketQueue()) {
             packet.apply(player);
         }

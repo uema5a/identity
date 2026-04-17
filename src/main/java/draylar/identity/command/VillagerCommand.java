@@ -1,81 +1,82 @@
 package draylar.identity.command;
 
 import com.mojang.brigadier.arguments.StringArgumentType;
-import dev.architectury.event.events.common.CommandRegistrationEvent;
+import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import draylar.identity.api.PlayerIdentity;
-import draylar.identity.api.platform.IdentityConfig;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.passive.VillagerEntity;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.server.command.CommandManager;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.text.Text;
-import net.minecraft.util.Hand;
+import draylar.identity.config.IdentityConfig;
+import net.minecraft.commands.Commands;
+import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.npc.Villager;
 
 import java.util.Map;
 
 public class VillagerCommand {
 
     public static void register() {
-        CommandRegistrationEvent.EVENT.register((dispatcher, registryAccess, selection) -> {
+        CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
             dispatcher.register(
-                    CommandManager.literal("identity_villager")
+                    Commands.literal("identity_villager")
                             .requires(src -> true)
-                            .then(CommandManager.literal("list")
+                            .then(Commands.literal("list")
                                     .executes(ctx -> {
-                                        ServerPlayerEntity player = ctx.getSource().getPlayer();
-                                        Map<String, NbtCompound> map = PlayerIdentity.getVillagerIdentities(player);
+                                        ServerPlayer player = ctx.getSource().getPlayer();
+                                        Map<String, CompoundTag> map = PlayerIdentity.getVillagerIdentities(player);
                                         if (map.isEmpty()) {
-                                            player.sendMessage(Text.literal("You have no saved villager professions."), false);
+                                            player.sendSystemMessage(Component.literal("You have no saved villager professions."));
                                             return 1;
                                         }
-                                        player.sendMessage(Text.literal("Saved villager professions:"), false);
+                                        player.sendSystemMessage(Component.literal("Saved villager professions:"));
                                         map.forEach((name, tag) -> {
                                             String prof = tag.getString("ProfessionId");
                                             String dim = tag.getString("WorkstationDim");
                                             long posLong = tag.contains("WorkstationPos") ? tag.getLong("WorkstationPos") : Long.MIN_VALUE;
-                                            net.minecraft.util.math.BlockPos blockPos = posLong == Long.MIN_VALUE ? null : net.minecraft.util.math.BlockPos.fromLong(posLong);
+                                            BlockPos blockPos = posLong == Long.MIN_VALUE ? null : BlockPos.of(posLong);
                                             String location = blockPos == null ? "?" : (blockPos.getX() + ", " + blockPos.getY() + ", " + blockPos.getZ());
-                                            player.sendMessage(Text.literal("- " + name + " -> " + prof + " @ " + dim + " " + location), false);
+                                            player.sendSystemMessage(Component.literal("- " + name + " -> " + prof + " @ " + dim + " " + location));
                                         });
                                         return 1;
                                     }))
-                            .then(CommandManager.literal("show")
-                                    .then(CommandManager.argument("name", StringArgumentType.string())
+                            .then(Commands.literal("show")
+                                    .then(Commands.argument("name", StringArgumentType.string())
                                             .executes(ctx -> {
-                                                ServerPlayerEntity player = ctx.getSource().getPlayer();
+                                                ServerPlayer player = ctx.getSource().getPlayer();
                                                 String name = StringArgumentType.getString(ctx, "name");
-                                                Map<String, NbtCompound> map = PlayerIdentity.getVillagerIdentities(player);
+                                                Map<String, CompoundTag> map = PlayerIdentity.getVillagerIdentities(player);
                                                 if (!map.containsKey(name)) {
-                                                    player.sendMessage(Text.literal("No villager saved under name: " + name), false);
+                                                    player.sendSystemMessage(Component.literal("No villager saved under name: " + name));
                                                     return 0;
                                                 }
-                                                NbtCompound tag = map.get(name);
+                                                CompoundTag tag = map.get(name);
                                                 String prof = tag.getString("ProfessionId");
                                                 String dim = tag.getString("WorkstationDim");
                                                 long posLong = tag.contains("WorkstationPos") ? tag.getLong("WorkstationPos") : Long.MIN_VALUE;
-                                                net.minecraft.util.math.BlockPos blockPos = posLong == Long.MIN_VALUE ? null : net.minecraft.util.math.BlockPos.fromLong(posLong);
+                                                BlockPos blockPos = posLong == Long.MIN_VALUE ? null : BlockPos.of(posLong);
                                                 String location = blockPos == null ? "?" : (blockPos.getX() + ", " + blockPos.getY() + ", " + blockPos.getZ());
-                                                player.sendMessage(Text.literal("Villager '" + name + "' profession: " + prof + " @ " + dim + " " + location), false);
+                                                player.sendSystemMessage(Component.literal("Villager '" + name + "' profession: " + prof + " @ " + dim + " " + location));
                                                 return 1;
                                             })))
-                            .then(CommandManager.literal("trade")
-                                    .requires(src -> src.hasPermissionLevel(2))
-                                    .then(CommandManager.literal("myself")
+                            .then(Commands.literal("trade")
+                                    .requires(src -> src.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                                    .then(Commands.literal("myself")
                                             .executes(ctx -> {
-                                                ServerPlayerEntity player = ctx.getSource().getPlayer();
+                                                ServerPlayer player = ctx.getSource().getPlayer();
                                                 if (!IdentityConfig.getInstance().allowSelfTrading()) {
-                                                    player.sendMessage(Text.translatable("identity.profession.trade.self_disabled"), false);
+                                                    player.sendSystemMessage(Component.translatable("identity.profession.trade.self_disabled"));
                                                     return 0;
                                                 }
 
                                                 LivingEntity identity = PlayerIdentity.getIdentity(player);
-                                                if (!(identity instanceof VillagerEntity villager)) {
-                                                    player.sendMessage(Text.translatable("identity.profession.trade.require_villager"), false);
+                                                if (!(identity instanceof Villager villager)) {
+                                                    player.sendSystemMessage(Component.translatable("identity.profession.trade.require_villager"));
                                                     return 0;
                                                 }
 
-                                                villager.interactMob(player, Hand.MAIN_HAND);
+                                                villager.mobInteract(player, InteractionHand.MAIN_HAND);
                                                 return 1;
                                             })))
             );
@@ -85,4 +86,3 @@ public class VillagerCommand {
     private VillagerCommand() {
     }
 }
-

@@ -1,23 +1,23 @@
 package draylar.identity.impl.tick;
 
-import dev.architectury.event.events.client.ClientTickEvent;
 import draylar.identity.IdentityClient;
-import draylar.identity.api.platform.IdentityConfig;
+import draylar.identity.config.IdentityConfig;
 import draylar.identity.screen.IdentityScreen;
-import net.minecraft.client.MinecraftClient;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+import net.minecraft.client.Minecraft;
 
-public class MenuKeyPressHandler implements ClientTickEvent.Client {
+public class MenuKeyPressHandler implements ClientTickEvents.StartTick {
 
     @Override
-    public void tick(MinecraftClient client) {
-        assert client.player != null;
+    public void onStartTick(Minecraft client) {
+        if(client.player == null) return;
 
-        if(IdentityClient.MENU_KEY.wasPressed()) {
+        if(IdentityClient.MENU_KEY.consumeClick()) {
             if(IdentityConfig.getInstance().enableClientSwapMenu() ||
-                client.player.hasPermissionLevel(3) ||
+                client.player.hasPermissions(3) ||
                 IdentityConfig.getInstance().allowedSwappers().stream()
                     .anyMatch(p -> p.equalsIgnoreCase(client.player.getGameProfile().getName()))) {
-                MinecraftClient.getInstance().setScreen(new IdentityScreen());
+                Minecraft.getInstance().setScreen(new IdentityScreen());
             }
         }
     }
