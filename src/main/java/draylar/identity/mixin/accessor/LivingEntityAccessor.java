@@ -1,11 +1,9 @@
 package draylar.identity.mixin.accessor;
 
 import draylar.identity.compat.LivingEntityCompatAccessor;
-import net.minecraft.entity.EntityDimensions;
-import net.minecraft.entity.EntityPose;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.damage.DamageSource;
-import net.minecraft.sound.SoundEvent;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.sounds.SoundEvent;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 import org.spongepowered.asm.mixin.gen.Invoker;
@@ -13,14 +11,10 @@ import org.spongepowered.asm.mixin.gen.Invoker;
 @Mixin(LivingEntity.class)
 public interface LivingEntityAccessor extends LivingEntityCompatAccessor {
 
-
     @Accessor
     boolean isJumping();
 
-    @Invoker
-    float callGetActiveEyeHeight(EntityPose pose, EntityDimensions dimensions);
-
-    @Invoker
+    @Invoker("updatingUsingItem")
     void callTickActiveItemStack();
 
     @Invoker
@@ -33,23 +27,17 @@ public interface LivingEntityAccessor extends LivingEntityCompatAccessor {
     void callPlayBlockFallSound();
 
     @Invoker
-    int callComputeFallDamage(float fallDistance, float damageMultiplier);
+    int callCalculateFallDamage(double fallDistance, float damageMultiplier);
 
     @Invoker
     float callGetSoundVolume();
 
-    @Invoker
+    @Invoker("getVoicePitch")
     float callGetSoundPitch();
 
     @Invoker
-    void callSetLivingFlag(int mask, boolean value);
+    void callSetLivingEntityFlag(int mask, boolean value);
 
-    @Invoker
-    float callGetEyeHeight(EntityPose pose, EntityDimensions dimensions);
-
-    // 🔥 Add this to access getNextAirOnLand(int)
     @Invoker("getNextAirOnLand")
     int identity$getNextAirOnLand(int air);
-
-
 }

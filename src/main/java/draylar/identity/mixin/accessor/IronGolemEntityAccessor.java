@@ -1,14 +1,14 @@
 package draylar.identity.mixin.accessor;
 
-import net.minecraft.entity.passive.IronGolemEntity;
+import net.minecraft.world.entity.animal.golem.IronGolem;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 
-@Mixin(IronGolemEntity.class)
+@Mixin(IronGolem.class)
 public interface IronGolemEntityAccessor {
-    @Accessor
+    @Accessor("attackAnimationTick")
     int getAttackTicksLeft();
 
-    @Accessor
-    void setAttackTicksLeft(int attackTicksLeft);
+    @Accessor("attackAnimationTick")
+    void setAttackTicksLeft(int attackAnimationTick);
 }

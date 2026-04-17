@@ -1,10 +1,10 @@
 package draylar.identity.mixin.accessor;
 
-import net.minecraft.entity.mob.RavagerEntity;
+import net.minecraft.world.entity.monster.Ravager;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 
-@Mixin(RavagerEntity.class)
+@Mixin(Ravager.class)
 public interface RavagerEntityAccessor {
     @Accessor
     int getAttackTick();

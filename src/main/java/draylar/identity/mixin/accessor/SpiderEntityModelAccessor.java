@@ -1,11 +1,11 @@
 package draylar.identity.mixin.accessor;
 
-import net.minecraft.client.model.ModelPart;
-import net.minecraft.client.render.entity.model.SpiderEntityModel;
+import net.minecraft.client.model.geom.ModelPart;
+import net.minecraft.client.model.monster.spider.SpiderModel;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 
-@Mixin(SpiderEntityModel.class)
+@Mixin(SpiderModel.class)
 public interface SpiderEntityModelAccessor {
     @Accessor
     ModelPart getRightFrontLeg();

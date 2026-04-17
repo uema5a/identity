@@ -1,26 +1,28 @@
 package draylar.identity.mixin.accessor;
 
-import net.minecraft.village.VillagerData;
-import net.minecraft.entity.passive.VillagerEntity;
+import net.minecraft.world.entity.npc.Villager;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 import org.spongepowered.asm.mixin.gen.Invoker;
 
-@Mixin(VillagerEntity.class)
+@Mixin(Villager.class)
 public interface VillagerEntityAccessor {
 
-    @Accessor("experience")
+    @Accessor("villagerXp")
     int getExperience();
 
-    @Accessor("experience")
+    @Accessor("villagerXp")
     void setExperience(int value);
 
+    // TODO descriptor verify - canLevelUp may have been renamed in MC 26.1
     @Invoker("canLevelUp")
     boolean callGetNextLevelExperience();
 
+    // TODO descriptor verify - fillRecipes may have been renamed in MC 26.1
     @Invoker("fillRecipes")
     void callFillRecipes();
 
+    // TODO descriptor verify - levelUp may have been renamed in MC 26.1
     @Invoker("levelUp")
     void callLevelUp();
 }

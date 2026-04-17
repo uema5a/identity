@@ -1,12 +1,12 @@
 package draylar.identity.mixin.accessor;
 
-import net.minecraft.client.model.ModelPart;
-import net.minecraft.client.render.entity.model.BlazeEntityModel;
+import net.minecraft.client.model.geom.ModelPart;
+import net.minecraft.client.model.monster.blaze.BlazeModel;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 
-@Mixin(BlazeEntityModel.class)
+@Mixin(BlazeModel.class)
 public interface BlazeEntityModelAccessor {
-    @Accessor
+    @Accessor("upperBodyParts")
     ModelPart[] getRods();
 }
