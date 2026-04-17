@@ -1,117 +1,53 @@
 plugins {
-    id 'java-library'
-    id 'dev.architectury.loom' version '1.7-SNAPSHOT' apply false
-    id 'architectury-plugin' version '3.4-SNAPSHOT'
-    id 'com.gradleup.shadow' version '8.3.6' apply false
+    id 'net.fabricmc.fabric-loom' version '1.15-SNAPSHOT'
+    id 'maven-publish'
+}
+
+version = "${mod_version}-${minecraft_version}"
+group = maven_group
+base {
+    archivesName = archives_base_name
 }
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(17)
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+    withSourcesJar()
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${minecraft_version}"
+    // No mappings - 26.1 is fully unobfuscated
+    implementation "net.fabricmc:fabric-loader:${loader_version}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${fabric_api_version}"
+}
+
+processResources {
+    inputs.property "version", project.version
+
+    filesMatching("fabric.mod.json") {
+        expand "version": project.version
     }
 }
 
-architectury {
-    minecraft = rootProject.minecraft_version
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = "UTF-8"
+    options.release = 25
 }
 
-subprojects {
-    apply plugin: 'dev.architectury.loom'
-    apply plugin: 'architectury-plugin'
-    apply plugin: 'maven-publish'
-
-    dependencies {
-        minecraft "com.mojang:minecraft:${rootProject.minecraft_version}"
-        mappings "net.fabricmc:yarn:${rootProject.yarn_mappings}:v2"
-
-
-    }
-}
-
-allprojects {
-    apply plugin: "java"
-    apply plugin: "architectury-plugin"
-    apply plugin: "maven-publish"
-
-    java {
-        toolchain {
-            languageVersion = JavaLanguageVersion.of(17)
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
         }
     }
-
-    archivesBaseName = rootProject.archives_base_name
-    version = rootProject.mod_version + "-" + rootProject.minecraft_version
-    group = rootProject.maven_group
 
     repositories {
-        // Add repositories to retrieve artifacts from in here.
-        // You should only use this when depending on other mods because
-        // Loom adds the essential maven repositories to download Minecraft and libraries from automatically.
-        // See https://docs.gradle.org/current/userguide/declaring_repositories.html
-        // for more information about repositories.
-        maven {
-            name = "Citadel & Alex's Mobs"
-            url = "https://dl.cloudsmith.io/public/tslat/systems/maven/"
-        }
-        maven {
-            name = "CurseMaven"
-            url = "https://cursemaven.com"
-        }
-        maven {
-            url = "https://api.modrinth.com/maven"
-        }
-        maven {
-            name = 'GeckoLib'
-            url 'https://dl.cloudsmith.io/public/geckolib3/geckolib/maven/'
-            content {
-                includeGroupByRegex("software\\.bernie.*")
-                includeGroup("com.eliotlash.mclib")
-            }
-        }
-        maven {
-            name = "Terraformers"
-            url = "https://maven.terraformersmc.com/"
-        }
-        maven { url "https://maven.shedaniel.me/" }
-        flatDir { dir 'libs' }
-    }
-
-    tasks.withType(JavaCompile) {
-        options.encoding = "UTF-8"
-        options.release = 17
-    }
-
-    java {
-        withSourcesJar()
-    }
-    
-    
-    
-}
-import groovy.json.JsonOutput
-tasks.register("discordWebhook") {
-    doLast {
-        def webhookUrl = System.getenv("DISCORD_WEBHOOK_URL")
-        def changelogText = rootProject.file("IdentityChangeLog.md").text
-
-        def payload = [
-                username: "Build Bot",
-                allowed_mentions: [ parse: ["roles"] ],
-                content: "**New release published!** 🎉\n" +
-                        "<@&1363945953546997810>\n" + // role mention
-                        "Project: Identity\n" +
-                        "Version: v${version}\n\n" +
-                        "${changelogText.take(1891)}"
-        ]
-
-        println "Sending release notification to Discord..."
-        def connection = new URL(webhookUrl).openConnection()
-        connection.with {
-            doOutput = true
-            requestMethod = "POST"
-            setRequestProperty("Content-Type", "application/json")
-            outputStream.withWriter("UTF-8") { it << JsonOutput.toJson(payload) }
-            println "Webhook sent with response code: ${responseCode}"
-        }
+        // Add repositories to publish to here.
     }
 }

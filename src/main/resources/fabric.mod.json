@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "id": "identity",
+  "version": "${version}",
+  "name": "Identity",
+  "description": "Play as your favorite entities!",
+  "authors": [
+    "Draylar",
+    "Gaboouu"
+  ],
+  "contributors": [
+    "James103",
+    "Pyrofab",
+    "AllanChain"
+  ],
+  "license": "MIT",
+  "icon": "icon.png",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "draylar.identity.IdentityFabric"
+    ],
+    "client": [
+      "draylar.identity.IdentityFabricClient"
+    ]
+  },
+  "mixins": [
+    "identity.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.18.4",
+    "fabric-api": "*",
+    "minecraft": ">=26.1"
+  }
+}

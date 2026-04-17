@@ -34,3 +34,6 @@ run/
 /server/
 /logs/
 /.architectury-transformer/debug.log
+
+# migration scratch (local-only reference patches)
+.migration-patches/
