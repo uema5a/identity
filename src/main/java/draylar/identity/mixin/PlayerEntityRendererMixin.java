@@ -55,9 +55,8 @@ public abstract class PlayerEntityRendererMixin extends LivingEntityRenderer {
             at = @At("TAIL")
     )
     private void identity_onExtractRenderState(Avatar avatarEntity, AvatarRenderState state, float partialTick, CallbackInfo ci) {
+        // Only clear cache for non-Player avatars if we had a cached entry from a prior extract; otherwise leave alone.
         if (!(avatarEntity instanceof Player player)) {
-            IdentityRenderCache.cachedIdentity = null;
-            IdentityRenderCache.cachedPlayer = null;
             return;
         }
 
@@ -67,6 +66,8 @@ public abstract class PlayerEntityRendererMixin extends LivingEntityRenderer {
             IdentityRenderCache.cachedPlayer = null;
             return;
         }
+
+        try {
 
         IdentityRenderCache.cachedPlayer = player;
         IdentityRenderCache.cachedPartialTick = partialTick;
@@ -79,6 +80,9 @@ public abstract class PlayerEntityRendererMixin extends LivingEntityRenderer {
         }
 
         IdentityRenderCache.cachedIdentity = identity;
+        } catch (Throwable t) {
+            draylar.identity.Identity.LOGGER.warn("[Identity] extractRenderState failed", t);
+        }
     }
 
     @Unique
