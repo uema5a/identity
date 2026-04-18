@@ -14,9 +14,13 @@ import draylar.identity.network.NetworkHandler.OpenProfessionScreenPayload;
 import draylar.identity.network.NetworkHandler.UnlockSyncPayload;
 import draylar.identity.network.NetworkHandler.UseAbilityPayload;
 import draylar.identity.network.NetworkHandler.VillagerIdentitiesSyncPayload;
+import draylar.identity.network.client.VillagerProfessionClient;
+import draylar.identity.screen.IdentityScreen;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import net.minecraft.client.Minecraft;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.EntityType;
@@ -26,6 +30,7 @@ import net.minecraft.world.level.storage.TagValueInput;
 import net.minecraft.world.level.storage.ValueInput;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -149,17 +154,35 @@ public class ClientNetworking implements NetworkHandler {
         // xGabou villager S2C payloads
         // OpenProfessionScreen: server asks client to open profession-selection UI.
         ClientPlayNetworking.registerGlobalReceiver(OpenProfessionScreenPayload.TYPE, (payload, context) -> {
-            // TODO Phase B: port from old VillagerProfessionClient handler (opens VillagerProfessionScreen)
-            context.client().execute(() -> {
-                // no-op stub until B8 ports the screen-open logic
-            });
+            context.client().execute(() -> VillagerProfessionClient.openScreen(payload));
         });
 
         // VillagerIdentitiesSync: server syncs villager identity map + active key.
         ClientPlayNetworking.registerGlobalReceiver(VillagerIdentitiesSyncPayload.TYPE, (payload, context) -> {
-            // TODO Phase B: port from old VillagerIdentitiesPackets#registerClientHandler
+            CompoundTag root = payload.data();
+
             context.client().execute(() -> {
-                // no-op stub until B8 ports the villager-identities sync logic
+                runOrQueue(context.player(), player -> {
+                    if (root == null) return;
+                    PlayerDataProvider data = (PlayerDataProvider) player;
+                    @SuppressWarnings("unchecked")
+                    Map<String, CompoundTag> villagerIds =
+                            (Map<String, CompoundTag>) (Map<?, ?>) data.getVillagerIdentities();
+                    villagerIds.clear();
+                    CompoundTag villagerTag = root.getCompound("VillagerIdentities");
+                    for (String key : villagerTag.getAllKeys()) {
+                        villagerTag.getCompound(key).ifPresent(tag -> villagerIds.put(key, tag));
+                    }
+                    String active = root.contains("ActiveVillagerKey", Tag.TAG_STRING)
+                            ? root.getString("ActiveVillagerKey") : null;
+                    data.setActiveVillagerKey(active == null || active.isEmpty() ? null : active);
+
+                    // Refresh identity screen if open
+                    Minecraft mc = Minecraft.getInstance();
+                    if (mc.screen instanceof IdentityScreen screen) {
+                        screen.resize(mc, mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight());
+                    }
+                });
             });
         });
     }

@@ -1,71 +1,46 @@
 package draylar.identity.network.impl;
 
-import dev.architectury.networking.NetworkManager;
 import draylar.identity.api.PlayerIdentity;
 import draylar.identity.impl.PlayerDataProvider;
-import draylar.identity.network.NetworkHandler;
-import io.netty.buffer.Unpooled;
-import net.minecraft.entity.passive.VillagerEntity;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.network.PacketByteBuf;
-import net.minecraft.registry.Registries;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.util.Identifier;
-import net.minecraft.text.Text;
-import net.minecraft.village.VillagerData;
-import net.minecraft.village.VillagerProfession;
+import draylar.identity.network.NetworkHandler.OpenProfessionScreenPayload;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.village.poi.PoiTypes;
+import net.minecraft.world.entity.npc.Villager;
+import net.minecraft.world.entity.npc.VillagerData;
+import net.minecraft.world.entity.npc.VillagerProfession;
+import net.minecraft.world.level.Level;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.core.particles.ParticleTypes;
+
+import java.util.Map;
 
 public class VillagerProfessionPackets {
 
-    public static void openScreen(ServerPlayerEntity player, Identifier professionId, net.minecraft.util.math.BlockPos pos, Identifier worldId, String existingName, String existingProfessionId) {
-        PacketByteBuf packet = new PacketByteBuf(Unpooled.buffer());
-        packet.writeIdentifier(professionId);
-        packet.writeBlockPos(pos);
-        packet.writeIdentifier(worldId);
-        packet.writeBoolean(existingName != null);
-        if (existingName != null) {
-            packet.writeString(existingName);
-            packet.writeString(existingProfessionId == null ? "" : existingProfessionId);
-        }
-        NetworkManager.sendToPlayer(player, NetworkHandler.OPEN_PROFESSION_SCREEN, packet);
+    public static void openScreen(ServerPlayer player, Identifier professionId, BlockPos pos, Identifier worldId, String existingName, String existingProfessionId) {
+        boolean hasExisting = existingName != null;
+        ServerPlayNetworking.send(player, new OpenProfessionScreenPayload(
+                professionId,
+                pos,
+                worldId,
+                hasExisting,
+                existingName == null ? "" : existingName,
+                existingProfessionId == null ? "" : existingProfessionId
+        ));
     }
 
-    public static void sendSetProfession(Identifier professionId, String name, boolean reset, net.minecraft.util.math.BlockPos pos, Identifier worldId, String originalName) {
-        PacketByteBuf packet = new PacketByteBuf(Unpooled.buffer());
-        packet.writeIdentifier(professionId);
-        packet.writeString(name);
-        packet.writeBoolean(reset);
-        packet.writeBlockPos(pos);
-        packet.writeIdentifier(worldId);
-        packet.writeBoolean(originalName != null);
-        if (originalName != null) {
-            packet.writeString(originalName);
-        }
-        NetworkManager.sendToServer(NetworkHandler.SET_PROFESSION, packet);
-    }
-
-    public static void registerServerHandler() {
-        NetworkManager.registerReceiver(NetworkManager.Side.C2S, NetworkHandler.SET_PROFESSION, (buf, context) -> {
-            Identifier professionId = buf.readIdentifier();
-            String name = buf.readString();
-            boolean reset = buf.readBoolean();
-            net.minecraft.util.math.BlockPos pos = buf.readBlockPos();
-            Identifier worldId = buf.readIdentifier();
-            boolean hasOriginal = buf.readBoolean();
-            String originalName = hasOriginal ? buf.readString() : null;
-            ServerPlayerEntity player = (ServerPlayerEntity) context.getPlayer();
-
-            context.getPlayer().getServer().execute(() -> {
-                handleServerRequest(player, professionId, name, reset, pos, worldId, originalName);
-            });
-        });
-    }
-
-    // client handler moved to draylar.identity.network.client.VillagerProfessionClient
-
-    private static void handleServerRequest(ServerPlayerEntity player, Identifier professionId, String rawName, boolean reset, net.minecraft.util.math.BlockPos pos, Identifier worldId, String originalName) {
+    public static void handleServerRequest(ServerPlayer player, Identifier professionId, String rawName, boolean reset, BlockPos pos, Identifier worldId, String originalName) {
         PlayerDataProvider data = (PlayerDataProvider) player;
-        java.util.Map<String, NbtCompound> map = data.getVillagerIdentities();
+        @SuppressWarnings("unchecked")
+        Map<String, CompoundTag> map = (Map<String, CompoundTag>) (Map<?, ?>) data.getVillagerIdentities();
         long workstationPos = pos.asLong();
         String trimmedName = rawName.trim();
 
@@ -74,7 +49,7 @@ public class VillagerProfessionPackets {
             existingKey = originalName;
         }
         if (existingKey == null) {
-            for (java.util.Map.Entry<String, NbtCompound> entry : map.entrySet()) {
+            for (Map.Entry<String, CompoundTag> entry : map.entrySet()) {
                 if (matchesWorkstation(entry.getValue(), worldId, workstationPos)) {
                     existingKey = entry.getKey();
                     break;
@@ -85,52 +60,53 @@ public class VillagerProfessionPackets {
         if (reset) {
             if (existingKey != null) {
                 data.removeVillagerIdentity(existingKey);
-                player.sendMessage(Text.translatable("identity.profession.removed", existingKey), false);
+                player.sendSystemMessage(Component.translatable("identity.profession.removed", existingKey));
                 PlayerIdentity.sync(player);
             } else {
-                player.sendMessage(Text.translatable("identity.profession.none"), false);
+                player.sendSystemMessage(Component.translatable("identity.profession.none"));
             }
             return;
         }
 
         if (trimmedName.isEmpty()) {
-            player.sendMessage(Text.translatable("identity.profession.require_name"), false);
+            player.sendSystemMessage(Component.translatable("identity.profession.require_name"));
             return;
         }
 
         if (map.containsKey(trimmedName) && (existingKey == null || !existingKey.equals(trimmedName))) {
-            player.sendMessage(Text.translatable("identity.profession.name_conflict", trimmedName), false);
+            player.sendSystemMessage(Component.translatable("identity.profession.name_conflict", trimmedName));
             return;
         }
 
-        net.minecraft.server.world.ServerWorld world = player.getServer().getWorld(net.minecraft.registry.RegistryKey.of(net.minecraft.registry.RegistryKeys.WORLD, worldId));
-        if (world == null || !world.getRegistryKey().equals(player.getWorld().getRegistryKey())) {
-            player.sendMessage(Text.translatable("identity.profession.invalid_world"), false);
+        ResourceKey<Level> worldKey = ResourceKey.create(Registries.DIMENSION, worldId);
+        ServerLevel world = player.server.getLevel(worldKey);
+        if (world == null || !world.dimension().equals(player.level().dimension())) {
+            player.sendSystemMessage(Component.translatable("identity.profession.invalid_world"));
             return;
         }
 
-        if (net.minecraft.world.poi.PointOfInterestTypes.getTypeForState(world.getBlockState(pos)).isEmpty()) {
-            player.sendMessage(Text.translatable("identity.profession.invalid_workstation"), false);
+        if (PoiTypes.forState(world.getBlockState(pos)).isEmpty()) {
+            player.sendSystemMessage(Component.translatable("identity.profession.invalid_workstation"));
             return;
         }
 
-        if (!(PlayerIdentity.getIdentity(player) instanceof VillagerEntity villager)) {
-            player.sendMessage(Text.translatable("identity.profession.missing_identity"), false);
+        if (!(PlayerIdentity.getIdentity(player) instanceof Villager villager)) {
+            player.sendSystemMessage(Component.translatable("identity.profession.missing_identity"));
             return;
         }
 
-        NbtCompound tag = new NbtCompound();
+        String professionIdStr = professionId.toString();
+        CompoundTag tag = new CompoundTag();
         VillagerProfession profession =
-                Registries.VILLAGER_PROFESSION.getOrEmpty(professionId)
+                BuiltInRegistries.VILLAGER_PROFESSION.getOptional(professionId)
                         .orElse(VillagerProfession.NONE);
 
-        villager.setVillagerData(new VillagerData(villager.getVillagerData().getType(), profession,villager.getVillagerData().getLevel()));
-        villager.writeNbt(tag);
-        tag.putString("ProfessionId", professionId.toString());
+        villager.setVillagerData(new VillagerData(villager.getVillagerData().getType(), profession, villager.getVillagerData().getLevel()));
+        villager.save(tag);
+        tag.putString("ProfessionId", professionIdStr);
         tag.putString("WorkstationDim", worldId.toString());
         tag.putLong("WorkstationPos", workstationPos);
         tag.putString("IdentityName", trimmedName);
-
 
         data.setVillagerIdentity(trimmedName, tag);
         if (existingKey != null && !existingKey.equals(trimmedName)) {
@@ -143,14 +119,15 @@ public class VillagerProfessionPackets {
         } else if (existingKey == null) {
             data.setActiveVillagerKey(trimmedName);
         }
-        Text professionText = Text.literal(professionId.toString());
-        player.sendMessage(Text.translatable(existingKey != null ? "identity.profession.updated" : "identity.profession.saved", trimmedName, professionText), false);
-        world.spawnParticles(net.minecraft.particle.ParticleTypes.HAPPY_VILLAGER, player.getX(), player.getY() + 1.0, player.getZ(), 10, 0.5, 0.5, 0.5, 0.0);
+
+        Component professionText = Component.literal(professionIdStr);
+        player.sendSystemMessage(Component.translatable(existingKey != null ? "identity.profession.updated" : "identity.profession.saved", trimmedName, professionText));
+        world.sendParticles(ParticleTypes.HAPPY_VILLAGER, player.getX(), player.getY() + 1.0, player.getZ(), 10, 0.5, 0.5, 0.5, 0.0);
         PlayerIdentity.sync(player);
-        draylar.identity.network.impl.VillagerIdentitiesPackets.sendSync(player);
+        VillagerIdentitiesPackets.sendSync(player);
     }
 
-    private static boolean matchesWorkstation(NbtCompound tag, Identifier worldId, long workstationPos) {
+    private static boolean matchesWorkstation(CompoundTag tag, Identifier worldId, long workstationPos) {
         if (tag == null) {
             return false;
         }

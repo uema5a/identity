@@ -8,6 +8,8 @@ import draylar.identity.network.NetworkHandler.TradeSyncPayload;
 import draylar.identity.network.NetworkHandler.UseAbilityPayload;
 import draylar.identity.network.impl.FavoritePackets;
 import draylar.identity.network.impl.SwapPackets;
+import draylar.identity.network.impl.VillagerProfessionPackets;
+import draylar.identity.network.impl.VillagerTradePackets;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.EntityType;
@@ -23,14 +25,21 @@ public class ServerNetworking implements NetworkHandler {
         FavoritePackets.registerFavoriteRequestHandler();
         SwapPackets.registerIdentityRequestPacketHandler();
 
-        // xGabou villager C2S handlers (stubs — Phase B8 ports them)
+        // xGabou villager C2S handlers
         ServerPlayNetworking.registerGlobalReceiver(SaveProfessionPayload.TYPE, (payload, context) -> {
-            // TODO Phase B: port from old VillagerProfessionPackets#registerServerHandler
+            ServerPlayer player = context.player();
+            context.server().execute(() -> VillagerProfessionPackets.handleServerRequest(
+                    player,
+                    payload.professionId(),
+                    payload.name(),
+                    payload.reset(),
+                    payload.workstationPos(),
+                    payload.worldId(),
+                    payload.hasOriginal() ? payload.originalName() : null
+            ));
         });
 
-        ServerPlayNetworking.registerGlobalReceiver(TradeSyncPayload.TYPE, (payload, context) -> {
-            // TODO Phase B: port from old VillagerTradePackets#registerTradeRequestHandler
-        });
+        VillagerTradePackets.registerTradeRequestHandler();
     }
 
     public static void registerUseAbilityPacketHandler() {
