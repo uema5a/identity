@@ -1,14 +1,13 @@
 package draylar.identity.api;
 
 import draylar.identity.registry.IdentityEntityTags;
-import net.minecraft.core.HolderSet;
+import net.minecraft.core.Holder;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.entity.EntityType;
 
 import java.util.HashSet;
-import java.util.Optional;
 import java.util.Set;
 
 public class SafeTagManager {
@@ -48,19 +47,21 @@ public class SafeTagManager {
     private static void loadTagSafely(TagKey<EntityType<?>> tagKey, Set<Identifier> targetSet, String tagName) {
         targetSet.clear();
 
-        Optional<HolderSet.Named<EntityType<?>>> tagOpt = BuiltInRegistries.ENTITY_TYPE.getTag(tagKey);
-        if (tagOpt.isPresent()) {
-            for (var holder : tagOpt.get()) {
-                Identifier id = BuiltInRegistries.ENTITY_TYPE.getKey(holder.value());
-                if (id != null) {
-                    targetSet.add(id);
-                } else {
-                    System.out.println("[Identity] Skipping missing entity in " + tagName);
-                }
+        Iterable<Holder<EntityType<?>>> tagIterable = BuiltInRegistries.ENTITY_TYPE.getTagOrEmpty(tagKey);
+        boolean found = false;
+        for (Holder<EntityType<?>> holder : tagIterable) {
+            found = true;
+            Identifier id = BuiltInRegistries.ENTITY_TYPE.getKey(holder.value());
+            if (id != null) {
+                targetSet.add(id);
+            } else {
+                System.out.println("[Identity] Skipping missing entity in " + tagName);
             }
+        }
+        if (found) {
             System.out.println("[Identity] Loaded " + targetSet.size() + " entries into " + tagName);
         } else {
-            System.out.println("[Identity] Warning: Tag not found: " + tagName);
+            System.out.println("[Identity] Warning: Tag not found or empty: " + tagName);
         }
     }
 

@@ -44,7 +44,7 @@ public class Identity {
         registerJoinSyncPacket();
         IdentityTickHandlers.initialize();
         ServerLifecycleEvents.SERVER_STARTING.register(server -> {
-            SafeTagManager.loadAll(server);
+            SafeTagManager.loadAll();
         });
     }
 

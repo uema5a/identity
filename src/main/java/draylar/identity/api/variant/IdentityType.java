@@ -2,7 +2,6 @@ package draylar.identity.api.variant;
 
 import draylar.identity.Identity;
 import draylar.identity.impl.variant.*;
-import net.Gabou.gaboulibs.util.CompatUtils;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.EntitySpawnReason;
@@ -17,6 +16,9 @@ import org.jetbrains.annotations.Nullable;
 import java.util.*;
 
 public class IdentityType<T extends LivingEntity> {
+
+    // TODO: re-implement gaboulibs CompatUtils functionality locally (blacklist/incompatible tracking)
+    private static final java.util.Set<String> INCOMPATIBLE_ENTITY_TYPES = new java.util.HashSet<>();
 
     private static final List<EntityType<? extends LivingEntity>> LIVING_TYPE_CASH = new ArrayList<>();
     private static final Map<EntityType<? extends LivingEntity>, TypeProvider<?>> VARIANT_BY_TYPE = new LinkedHashMap<>();
@@ -94,10 +96,10 @@ public class IdentityType<T extends LivingEntity> {
         if (LIVING_TYPE_CASH.isEmpty()) {
             for (EntityType<?> type : BuiltInRegistries.ENTITY_TYPE) {
 
-                // Skip if already blacklisted (xGabou: CompatUtils integration)
+                // Skip if already marked as incompatible
                 Identifier id = BuiltInRegistries.ENTITY_TYPE.getKey(type);
 
-                if (CompatUtils.isBlacklistedEntityType(id.toString())) {
+                if (INCOMPATIBLE_ENTITY_TYPES.contains(id.toString())) {
                     continue;
                 }
 
@@ -112,7 +114,7 @@ public class IdentityType<T extends LivingEntity> {
 
                 } catch (Throwable t) {
                     // Mark incompatible so future checks skip instantly
-                    CompatUtils.markIncompatibleEntityType(id.toString());
+                    INCOMPATIBLE_ENTITY_TYPES.add(id.toString());
                     Identity.LOGGER.warn("Skipping incompatible identity type {} during cache.", type, t);
                 }
             }
