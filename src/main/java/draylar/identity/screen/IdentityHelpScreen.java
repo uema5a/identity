@@ -15,7 +15,8 @@ public class IdentityHelpScreen extends Screen {
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor extractor, int mouseX, int mouseY, float delta) {
-        extractBackground(extractor, mouseX, mouseY, delta);
+        // extractBackground triggers blur which can only be called once per frame; use a dark overlay instead.
+        extractor.fill(0, 0, this.width, this.height, 0x80000000);
 
         extractor.pose().pushMatrix();
         extractor.pose().scale(0.75f, 0.75f);
