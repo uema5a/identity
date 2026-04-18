@@ -30,7 +30,7 @@ public class PlayerWidget extends AbstractWidget {
 
     @Override
     public void onClick(MouseButtonEvent event, boolean forwarded) {
-        SwapPackets.sendSwapRequest(null);
+        SwapPackets.sendSwapRequest(null, false);
         parent.disableAll();
     }
 }

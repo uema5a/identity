@@ -37,7 +37,4 @@ public interface LivingEntityAccessor extends LivingEntityCompatAccessor {
 
     @Invoker
     void callSetLivingEntityFlag(int mask, boolean value);
-
-    @Invoker("getNextAirOnLand")
-    int identity$getNextAirOnLand(int air);
 }

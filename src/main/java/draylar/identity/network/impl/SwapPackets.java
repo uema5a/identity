@@ -14,6 +14,7 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.permissions.Permissions;
 import net.minecraft.util.ProblemReporter;
+import net.minecraft.world.entity.AgeableMob;
 import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
@@ -93,6 +94,11 @@ public class SwapPackets {
                                     created = type.create(player.level());
                                 }
 
+                                // Apply baby flag if requested
+                                if (payload.baby() && created instanceof AgeableMob ageable) {
+                                    ageable.setBaby(true);
+                                }
+
                                 Identity.LOGGER.debug("[Identity] Created entity = {}", created);
                                 PlayerIdentity.updateIdentity(player, type, created);
                                 ((PlayerDataProvider) player).setActiveVillagerKey(selectedVillagerKey);
@@ -115,14 +121,14 @@ public class SwapPackets {
         });
     }
 
-    public static void sendSwapRequest(@Nullable IdentityType<?> type) {
-        Identity.LOGGER.debug("[Identity] Client sending swap request: type={}", type);
+    public static void sendSwapRequest(@Nullable IdentityType<?> type, boolean baby) {
+        Identity.LOGGER.debug("[Identity] Client sending swap request: type={}, baby={}", type, baby);
         if (type != null) {
             String entityTypeId = BuiltInRegistries.ENTITY_TYPE.getKey(type.getEntityType()).toString();
-            Identity.LOGGER.debug("[Identity] Sending payload: entityTypeId={}, variant={}", entityTypeId, type.getVariantData());
-            ClientPlayNetworking.send(new IdentityRequestPayload(true, entityTypeId, type.getVariantData()));
+            Identity.LOGGER.debug("[Identity] Sending payload: entityTypeId={}, variant={}, baby={}", entityTypeId, type.getVariantData(), baby);
+            ClientPlayNetworking.send(new IdentityRequestPayload(true, entityTypeId, type.getVariantData(), baby));
         } else {
-            ClientPlayNetworking.send(new IdentityRequestPayload(false, "", 0));
+            ClientPlayNetworking.send(new IdentityRequestPayload(false, "", 0, false));
         }
     }
 }

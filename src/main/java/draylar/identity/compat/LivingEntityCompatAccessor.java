@@ -22,11 +22,5 @@ public interface LivingEntityCompatAccessor {
 
     void callSetLivingEntityFlag(int mask, boolean value);
 
-    float callGetEyeHeight(Pose pose, EntityDimensions dimensions);
-
-    int identity$getNextAirOnLand(int air);
-
-    float callGetActiveEyeHeight(Pose pose, EntityDimensions dimensions);
-
     void callTickActiveItemStack();
 }

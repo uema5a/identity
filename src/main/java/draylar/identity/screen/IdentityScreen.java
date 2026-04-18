@@ -6,6 +6,7 @@ import draylar.identity.api.PlayerIdentity;
 import draylar.identity.api.PlayerUnlocks;
 import draylar.identity.api.variant.IdentityType;
 import draylar.identity.mixin.accessor.ScreenAccessor;
+import draylar.identity.network.impl.SwapPackets;
 import draylar.identity.screen.widget.EntityWidget;
 import draylar.identity.screen.widget.HelpWidget;
 import draylar.identity.screen.widget.PlayerWidget;
@@ -13,6 +14,7 @@ import draylar.identity.screen.widget.SearchWidget;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.Checkbox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.player.LocalPlayer;
 import com.mojang.blaze3d.platform.Window;
@@ -34,6 +36,7 @@ public class IdentityScreen extends Screen {
     private SearchWidget searchBar;
     private PlayerWidget playerButton;
     private Button helpButton;
+    private Checkbox babyCheckbox;
     private String lastSearchContents = "";
 
     public IdentityScreen() {
@@ -53,11 +56,13 @@ public class IdentityScreen extends Screen {
         searchBar = createSearchBar();
         playerButton = createPlayerButton();
         helpButton = createHelpButton();
+        babyCheckbox = createBabyCheckbox();
 
         populateRenderEntities();
         addRenderableWidget(searchBar);
         addRenderableWidget(playerButton);
         addRenderableWidget(helpButton);
+        addRenderableWidget(babyCheckbox);
 
         // collect unlocked entities
         unlocked.clear();
@@ -116,6 +121,7 @@ public class IdentityScreen extends Screen {
         searchBar.extractRenderState(extractor, mouseX, mouseY, delta);
         playerButton.extractRenderState(extractor, mouseX, mouseY, delta);
         helpButton.extractRenderState(extractor, mouseX, mouseY, delta);
+        if (babyCheckbox != null) babyCheckbox.extractRenderState(extractor, mouseX, mouseY, delta);
         renderEntityWidgets(extractor, mouseX, mouseY, delta);
     }
 
@@ -232,6 +238,28 @@ public class IdentityScreen extends Screen {
                 20);
     }
 
+    private Checkbox createBabyCheckbox() {
+        Window window = getWindow();
+        int x = (int) (window.getGuiScaledWidth() / 2f) + 80;
+        int y = 5;
+        return Checkbox.builder(Component.translatable("identity.baby"), Minecraft.getInstance().font)
+                .pos(x, y)
+                .onValueChange((checkbox, selected) -> {
+                    // Immediately re-apply current identity with new baby state
+                    if (minecraft.player != null) {
+                        IdentityType<?> currentType = PlayerIdentity.getIdentityType(minecraft.player);
+                        if (currentType != null) {
+                            SwapPackets.sendSwapRequest(currentType, selected);
+                        }
+                    }
+                })
+                .build();
+    }
+
+    public boolean isBabyMode() {
+        return babyCheckbox != null && babyCheckbox.selected();
+    }
+
     public Window getWindow() {
         return Minecraft.getInstance().getWindow();
     }
@@ -250,7 +278,8 @@ public class IdentityScreen extends Screen {
         if (event.y() < 35) {
             return searchBar.mouseClicked(event, forwarded)
                     || playerButton.mouseClicked(event, forwarded)
-                    || helpButton.mouseClicked(event, forwarded);
+                    || helpButton.mouseClicked(event, forwarded)
+                    || (babyCheckbox != null && babyCheckbox.mouseClicked(event, forwarded));
         } else {
             return super.mouseClicked(event, forwarded);
         }

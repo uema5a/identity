@@ -49,7 +49,7 @@ public class EntityWidget<T extends LivingEntity> extends AbstractWidget {
         if (bl) {
             // Update current Identity
             if (button == 0) {
-                SwapPackets.sendSwapRequest(type);
+                SwapPackets.sendSwapRequest(type, parent.isBabyMode());
                 parent.disableAll();
                 selected = true;
             }

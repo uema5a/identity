@@ -20,7 +20,7 @@ public interface NetworkHandler {
      * C2S: Client requests an identity swap.
      * Contains: boolean hasType, String entityTypeId (if hasType), int variant (if hasType)
      */
-    record IdentityRequestPayload(boolean hasType, String entityTypeId, int variant) implements CustomPacketPayload {
+    record IdentityRequestPayload(boolean hasType, String entityTypeId, int variant, boolean baby) implements CustomPacketPayload {
         public static final CustomPacketPayload.Type<IdentityRequestPayload> TYPE =
                 new CustomPacketPayload.Type<>(Identity.id("request"));
         public static final StreamCodec<RegistryFriendlyByteBuf, IdentityRequestPayload> STREAM_CODEC =
@@ -30,14 +30,15 @@ public interface NetworkHandler {
                             if (payload.hasType) {
                                 buf.writeUtf(payload.entityTypeId);
                                 buf.writeInt(payload.variant);
+                                buf.writeBoolean(payload.baby);
                             }
                         },
                         buf -> {
                             boolean hasType = buf.readBoolean();
                             if (hasType) {
-                                return new IdentityRequestPayload(true, buf.readUtf(), buf.readInt());
+                                return new IdentityRequestPayload(true, buf.readUtf(), buf.readInt(), buf.readBoolean());
                             }
-                            return new IdentityRequestPayload(false, "", 0);
+                            return new IdentityRequestPayload(false, "", 0, false);
                         }
                 );
 
