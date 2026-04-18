@@ -1,13 +1,13 @@
 package draylar.identity.screen;
 
 import draylar.identity.network.impl.VillagerProfessionPackets;
-import net.minecraft.client.gui.screen.ConfirmScreen;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.widget.ButtonWidget;
-import net.minecraft.client.gui.widget.TextFieldWidget;
-import net.minecraft.text.Text;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.screens.ConfirmScreen;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.network.chat.Component;
 import net.minecraft.util.Identifier;
 
 public class VillagerProfessionScreen extends Screen {
@@ -17,11 +17,11 @@ public class VillagerProfessionScreen extends Screen {
     private final Identifier worldId;
     private final String originalName;
     private final String existingProfessionId;
-    private TextFieldWidget nameField;
-    private ButtonWidget deleteButton;
+    private EditBox nameField;
+    private Button deleteButton;
 
     public VillagerProfessionScreen(Identifier professionId, net.minecraft.util.math.BlockPos pos, Identifier worldId, String originalName, String existingProfessionId) {
-        super(Text.translatable("identity.profession.title"));
+        super(Component.translatable("identity.profession.title"));
         this.professionId = professionId;
         this.pos = pos;
         this.worldId = worldId;
@@ -33,56 +33,54 @@ public class VillagerProfessionScreen extends Screen {
     protected void init() {
         int centerX = width / 2;
         int centerY = height / 2;
-        nameField = new TextFieldWidget(textRenderer, centerX - 100, centerY - 10, 200, 20, Text.empty());
+        nameField = new EditBox(font, centerX - 100, centerY - 10, 200, 20, Component.empty());
         if (originalName != null) {
-            nameField.setText(originalName);
+            nameField.setValue(originalName);
         }
-        addSelectableChild(nameField);
-        addDrawableChild(ButtonWidget.builder(Text.translatable("identity.profession.confirm"), button -> {
-            VillagerProfessionPackets.sendSetProfession(professionId, nameField.getText(), false, pos, worldId, originalName);
-            close();
-        }).dimensions(centerX - 100, centerY + 20, 98, 20).build());
-        deleteButton = ButtonWidget.builder(Text.translatable("identity.profession.delete"), button -> {
-            MinecraftClient.getInstance().setScreen(new ConfirmScreen(confirmed -> {
+        addWidget(nameField);
+        addRenderableWidget(Button.builder(Component.translatable("identity.profession.confirm"), button -> {
+            VillagerProfessionPackets.sendSetProfession(professionId, nameField.getValue(), false, pos, worldId, originalName);
+            onClose();
+        }).pos(centerX - 100, centerY + 20).size(98, 20).build());
+        deleteButton = Button.builder(Component.translatable("identity.profession.delete"), button -> {
+            Minecraft.getInstance().setScreen(new ConfirmScreen(confirmed -> {
                 if (confirmed) {
-                    VillagerProfessionPackets.sendSetProfession(professionId, nameField.getText(), true, pos, worldId, originalName);
+                    VillagerProfessionPackets.sendSetProfession(professionId, nameField.getValue(), true, pos, worldId, originalName);
                 }
-                MinecraftClient.getInstance().setScreen(null);
-            }, Text.translatable("identity.profession.delete"), Text.translatable("identity.profession.delete_confirm")));
-        }).dimensions(centerX + 2, centerY + 20, 98, 20).build();
+                Minecraft.getInstance().setScreen(null);
+            }, Component.translatable("identity.profession.delete"), Component.translatable("identity.profession.delete_confirm")));
+        }).pos(centerX + 2, centerY + 20).size(98, 20).build();
         deleteButton.active = originalName != null;
-        addDrawableChild(deleteButton);
+        addRenderableWidget(deleteButton);
         setInitialFocus(nameField);
     }
 
     @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        renderBackground(context);
-        super.render(context, mouseX, mouseY, delta);
+    public void extractRenderState(GuiGraphicsExtractor extractor, int mouseX, int mouseY, float delta) {
+        extractBackground(extractor, mouseX, mouseY, delta);
+        super.extractRenderState(extractor, mouseX, mouseY, delta);
         int titleY = height / 2 - 50;
-        context.drawCenteredTextWithShadow(textRenderer, title, width / 2, titleY, 0xFFFFFF);
+        extractor.centeredText(font, title, width / 2, titleY, 0xFFFFFF, true);
         int infoY = titleY + 15;
         if (originalName != null) {
-            context.drawCenteredTextWithShadow(textRenderer, Text.translatable("identity.profession.current_name", originalName), width / 2, infoY, 0xAAAAAA);
+            extractor.centeredText(font, Component.translatable("identity.profession.current_name", originalName), width / 2, infoY, 0xAAAAAA, true);
             infoY += 12;
             if (existingProfessionId != null && !existingProfessionId.isEmpty()) {
-                context.drawCenteredTextWithShadow(textRenderer, Text.translatable("identity.profession.current_profession", resolveProfessionName(existingProfessionId)), width / 2, infoY, 0xAAAAAA);
-                infoY += 12;
+                extractor.centeredText(font, Component.translatable("identity.profession.current_profession", resolveProfessionName(existingProfessionId)), width / 2, infoY, 0xAAAAAA, true);
             }
         } else {
-            context.drawCenteredTextWithShadow(textRenderer, Text.translatable("identity.profession.prompt"), width / 2, infoY, 0xAAAAAA);
-            infoY += 12;
+            extractor.centeredText(font, Component.translatable("identity.profession.prompt"), width / 2, infoY, 0xAAAAAA, true);
         }
-        nameField.render(context, mouseX, mouseY, delta);
+        nameField.extractRenderState(extractor, mouseX, mouseY, delta);
     }
 
     @Override
-    public void close() {
-        MinecraftClient.getInstance().setScreen(null);
+    public void onClose() {
+        Minecraft.getInstance().setScreen(null);
     }
 
-    private Text resolveProfessionName(String professionKey) {
+    private Component resolveProfessionName(String professionKey) {
         Identifier id = Identifier.tryParse(professionKey);
-        return id != null ? Text.literal(id.toString()) : Text.literal(professionKey);
+        return id != null ? Component.literal(id.toString()) : Component.literal(professionKey);
     }
 }
