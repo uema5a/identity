@@ -52,7 +52,6 @@
     "BipedEntityModelMixin",
     "ClientLivingEntityMixin",
     "ClientPlayerDebugMixin",
-    "DrownedOverlayMixin",
     "LivingEntitySubmitMixin",
     "PlayerEntityRendererMixin",
     "ShadowMixin",
