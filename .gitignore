@@ -37,3 +37,4 @@ run/
 
 # migration scratch (local-only reference patches)
 .migration-patches/
+.claude/
