@@ -2,30 +2,30 @@ package draylar.identity.mixin;
 
 import draylar.identity.Identity;
 import draylar.identity.api.FlightHelper;
-import draylar.identity.api.platform.IdentityConfig;
-import net.minecraft.advancement.Advancement;
-import net.minecraft.advancement.PlayerAdvancementTracker;
-import net.minecraft.server.network.ServerPlayerEntity;
+import draylar.identity.config.IdentityConfig;
+import net.minecraft.advancements.AdvancementHolder;
+import net.minecraft.server.PlayerAdvancements;
+import net.minecraft.server.level.ServerPlayer;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-@Mixin(PlayerAdvancementTracker.class)
+@Mixin(PlayerAdvancements.class)
 public class PlayerAdvancementTrackerMixin {
 
-    @Shadow private ServerPlayerEntity owner;
+    @Shadow private ServerPlayer player;
 
     @Inject(
-            method = "grantCriterion",
-            at = @At(value = "INVOKE", target = "Lnet/minecraft/advancement/AdvancementRewards;apply(Lnet/minecraft/server/network/ServerPlayerEntity;)V")
+            method = "award",
+            at = @At(value = "INVOKE", target = "Lnet/minecraft/advancements/AdvancementRewards;grant(Lnet/minecraft/server/level/ServerPlayer;)V")
     )
-    private void refreshFlight(Advancement advancement, String criterionName, CallbackInfoReturnable<Boolean> cir) {
-        if(Identity.hasFlyingPermissions(owner)) {
-            FlightHelper.grantFlightTo(owner);
-            owner.getAbilities().setFlySpeed(IdentityConfig.getInstance().flySpeed());
-            owner.sendAbilitiesUpdate();
+    private void refreshFlight(AdvancementHolder advancement, String criterionName, CallbackInfoReturnable<Boolean> cir) {
+        if(Identity.hasFlyingPermissions(player)) {
+            FlightHelper.grantFlightTo(player);
+            player.getAbilities().setFlyingSpeed(IdentityConfig.getInstance().flySpeed());
+            player.onUpdateAbilities();
         }
     }
 }
