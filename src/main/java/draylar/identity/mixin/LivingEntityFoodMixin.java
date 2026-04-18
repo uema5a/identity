@@ -25,12 +25,19 @@ public abstract class LivingEntityFoodMixin extends Entity {
     @Shadow
     public abstract ItemStack getUseItem();
 
+    // Lazy-init: Items.* would be null if evaluated during LivingEntity.<clinit>
     @Unique
-    private static final Set<Item> identity$WOLF_HARMFUL = Set.of(
-            Items.CHICKEN,
-            Items.PUFFERFISH,
-            Items.ROTTEN_FLESH
-    );
+    private static Set<Item> identity$wolfHarmful;
+
+    @Unique
+    private static Set<Item> identity$getWolfHarmful() {
+        Set<Item> set = identity$wolfHarmful;
+        if (set == null) {
+            set = Set.of(Items.CHICKEN, Items.PUFFERFISH, Items.ROTTEN_FLESH);
+            identity$wolfHarmful = set;
+        }
+        return set;
+    }
 
     public LivingEntityFoodMixin(EntityType<?> type, Level level) {
         super(type, level);
@@ -45,7 +52,7 @@ public abstract class LivingEntityFoodMixin extends Entity {
             return;
         }
         ItemStack useItem = getUseItem();
-        if (identity$WOLF_HARMFUL.contains(useItem.getItem())) {
+        if (identity$getWolfHarmful().contains(useItem.getItem())) {
             ci.cancel();
         }
     }
