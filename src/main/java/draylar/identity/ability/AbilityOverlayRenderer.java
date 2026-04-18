@@ -110,7 +110,9 @@ public class AbilityOverlayRenderer {
         ItemStack stack = new ItemStack(identityAbility.getIcon());
         guiGraphics.item(stack, (int) (width * .95f), (int) (height * .92f));
 
-        guiGraphics.disableScissor();
+        if (cooldownScale != 1) {
+            guiGraphics.disableScissor();
+        }
         guiGraphics.pose().popMatrix();
 
         lastCooldown = cd;
