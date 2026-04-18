@@ -1,260 +1,257 @@
 package draylar.identity.mixin;
 
+import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.datafixers.util.Pair;
+import draylar.identity.api.IdentityRenderCache;
 import draylar.identity.api.PlayerIdentity;
 import draylar.identity.api.model.ArmRenderingManipulator;
 import draylar.identity.api.model.EntityArms;
 import draylar.identity.api.model.EntityUpdater;
 import draylar.identity.api.model.EntityUpdaters;
-import draylar.identity.api.platform.IdentityConfig;
+import draylar.identity.config.IdentityConfig;
 import draylar.identity.mixin.accessor.EntityAccessor;
-import draylar.identity.compat.LivingEntityCompatAccessor;
-import draylar.identity.mixin.accessor.LivingEntityRendererAccessor;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.model.ModelPart;
-import net.minecraft.client.network.AbstractClientPlayerEntity;
-import net.minecraft.client.render.OverlayTexture;
-import net.minecraft.client.render.VertexConsumerProvider;
-import net.minecraft.client.render.entity.*;
-import net.minecraft.client.render.entity.model.BipedEntityModel;
-import net.minecraft.client.render.entity.model.EntityModel;
-import net.minecraft.client.render.entity.model.PlayerEntityModel;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.EquipmentSlot;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.mob.MobEntity;
-import net.minecraft.entity.mob.PhantomEntity;
-import net.minecraft.entity.passive.TameableEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.util.Arm;
-import net.minecraft.util.Hand;
-import net.minecraft.util.Pair;
-import net.minecraft.util.math.Vec3d;
+import draylar.identity.mixin.accessor.LivingEntityAccessor;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.model.EntityModel;
+import net.minecraft.client.model.HumanoidModel;
+import net.minecraft.client.model.geom.ModelPart;
+import net.minecraft.client.model.player.PlayerModel;
+import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.client.renderer.entity.EntityRenderer;
+import net.minecraft.client.renderer.entity.EntityRendererProvider;
+import net.minecraft.client.renderer.entity.LivingEntityRenderer;
+import net.minecraft.client.renderer.entity.player.AvatarRenderer;
+import net.minecraft.client.renderer.entity.state.AvatarRenderState;
+import net.minecraft.client.renderer.entity.state.EntityRenderState;
+import net.minecraft.client.renderer.entity.state.LivingEntityRenderState;
+import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.entity.Avatar;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.TamableAnimal;
+import net.minecraft.world.entity.monster.Phantom;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.phys.Vec3;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
+@Mixin(AvatarRenderer.class)
+public abstract class PlayerEntityRendererMixin extends LivingEntityRenderer {
 
-@Mixin(PlayerEntityRenderer.class)
-public abstract class PlayerEntityRendererMixin extends LivingEntityRenderer<AbstractClientPlayerEntity, PlayerEntityModel<AbstractClientPlayerEntity>> {
-
-    @Shadow
-    protected static BipedEntityModel.ArmPose getArmPose(AbstractClientPlayerEntity player, Hand hand) {
-        return null;
-    }
-
-    private PlayerEntityRendererMixin(EntityRendererFactory.Context ctx, PlayerEntityModel<AbstractClientPlayerEntity> model, float shadowRadius) {
+    private PlayerEntityRendererMixin(EntityRendererProvider.Context ctx, EntityModel model, float shadowRadius) {
         super(ctx, model, shadowRadius);
     }
 
     @Inject(
-            method = "render",
-            at = @At("HEAD"),
-            cancellable = true
+            method = "extractRenderState(Lnet/minecraft/world/entity/Avatar;Lnet/minecraft/client/renderer/entity/state/AvatarRenderState;F)V",
+            at = @At("TAIL")
     )
-    private void onRenderInject(AbstractClientPlayerEntity player, float f, float g, MatrixStack matrixStack, VertexConsumerProvider vertexConsumerProvider, int light, CallbackInfo ci) {
-        LivingEntity identity = PlayerIdentity.getIdentity(player);
-
-        if (identity != null) {
-            // === SYNC player → identity ===
-            LimbAnimatorAccessor target = (LimbAnimatorAccessor) identity.limbAnimator;
-            LimbAnimatorAccessor source = (LimbAnimatorAccessor) player.limbAnimator;
-
-            target.setPrevSpeed(source.getPrevSpeed());
-            target.setSpeed(source.getSpeed());
-            target.setPos(source.getPos());
-
-            identity.handSwinging = player.handSwinging;
-            identity.handSwingTicks = player.handSwingTicks;
-            identity.lastHandSwingProgress = player.lastHandSwingProgress;
-            identity.handSwingProgress = player.handSwingProgress;
-            identity.bodyYaw = player.bodyYaw;
-            identity.prevBodyYaw = player.prevBodyYaw;
-            identity.headYaw = player.headYaw;
-            identity.prevHeadYaw = player.prevHeadYaw;
-            identity.age = player.age;
-            identity.preferredHand = player.preferredHand;
-            identity.setOnGround(player.isOnGround());
-            identity.setVelocity(player.getVelocity());
-            identity.setSneaking(player.isSneaking());
-            identity.setSprinting(player.isSprinting());
-            identity.setSwimming(player.isSwimming());
-            identity.setCurrentHand(player.getActiveHand());
-            identity.setPose(player.getPose());
-
-            ((EntityAccessor) identity).setVehicle(player.getVehicle());
-            ((EntityAccessor) identity).setTouchingWater(player.isTouchingWater());
-
-            if (identity instanceof PhantomEntity) {
-                identity.setPitch(-player.getPitch());
-                identity.prevPitch = -player.prevPitch;
-            } else {
-                identity.setPitch(player.getPitch());
-                identity.prevPitch = player.prevPitch;
-            }
-
-            if (IdentityConfig.getInstance().identitiesEquipItems()) {
-                identity.equipStack(EquipmentSlot.MAINHAND, player.getEquippedStack(EquipmentSlot.MAINHAND));
-                identity.equipStack(EquipmentSlot.OFFHAND, player.getEquippedStack(EquipmentSlot.OFFHAND));
-            }
-
-            if (IdentityConfig.getInstance().identitiesEquipArmor()) {
-                identity.equipStack(EquipmentSlot.HEAD, player.getEquippedStack(EquipmentSlot.HEAD));
-                identity.equipStack(EquipmentSlot.CHEST, player.getEquippedStack(EquipmentSlot.CHEST));
-                identity.equipStack(EquipmentSlot.LEGS, player.getEquippedStack(EquipmentSlot.LEGS));
-                identity.equipStack(EquipmentSlot.FEET, player.getEquippedStack(EquipmentSlot.FEET));
-            }
-
-            if (identity instanceof MobEntity) {
-                ((MobEntity) identity).setAttacking(player.isUsingItem());
-            }
-
-            identity.setPose(player.getPose());
-            identity.setCurrentHand(player.getActiveHand() == null ? Hand.MAIN_HAND : player.getActiveHand());
-            ((LivingEntityCompatAccessor) identity).callSetLivingFlag(1, player.isUsingItem());
-            identity.getItemUseTime();
-            ((LivingEntityCompatAccessor) identity).callTickActiveItemStack();
-
-            EntityUpdater updater = EntityUpdaters.getUpdater((EntityType<? extends LivingEntity>) identity.getType());
-            if (updater != null) {
-                updater.update(player, identity);
-            }
-
-            // === RENDER ===
-            @SuppressWarnings("unchecked")
-            EntityRenderer<? super LivingEntity> renderer =
-                    (EntityRenderer<? super LivingEntity>) MinecraftClient.getInstance()
-                            .getEntityRenderDispatcher().getRenderer(identity);
-
-
-            if (renderer instanceof LivingEntityRenderer<?, ?> livingRenderer) {
-                identity_setBipedIdentityModelPose(player, identity, livingRenderer);
-            }
-
-
-            renderer.render(identity, f, g, matrixStack, vertexConsumerProvider, light);
-
-
-
-            if (IdentityConfig.getInstance().showPlayerNametag() && (player != MinecraftClient.getInstance().player || IdentityConfig.getInstance().shouldRenderOwnNameTag())) {
-                renderLabelIfPresent(player, player.getDisplayName(), matrixStack, vertexConsumerProvider, light);
-            }
-
-            // ⛔ Prevent vanilla render from running
-            ci.cancel();
+    private void identity_onExtractRenderState(Avatar avatarEntity, AvatarRenderState state, float partialTick, CallbackInfo ci) {
+        if (!(avatarEntity instanceof Player player)) {
+            IdentityRenderCache.cachedIdentity = null;
+            IdentityRenderCache.cachedPlayer = null;
+            return;
         }
+
+        LivingEntity identity = PlayerIdentity.getIdentity(player);
+        if (identity == null) {
+            IdentityRenderCache.cachedIdentity = null;
+            IdentityRenderCache.cachedPlayer = null;
+            return;
+        }
+
+        IdentityRenderCache.cachedPlayer = player;
+        IdentityRenderCache.cachedPartialTick = partialTick;
+        identity_syncPlayerToIdentity(player, identity);
+
+        @SuppressWarnings("unchecked")
+        EntityUpdater<LivingEntity> entityUpdater = (EntityUpdater<LivingEntity>) EntityUpdaters.getUpdater((EntityType<? extends LivingEntity>) identity.getType());
+        if (entityUpdater != null) {
+            entityUpdater.update(player, identity);
+        }
+
+        IdentityRenderCache.cachedIdentity = identity;
     }
 
+    @Unique
+    private void identity_syncPlayerToIdentity(Player player, LivingEntity identity) {
+        LimbAnimatorAccessor target = (LimbAnimatorAccessor) identity.walkAnimation;
+        LimbAnimatorAccessor source = (LimbAnimatorAccessor) player.walkAnimation;
+        target.setPrevSpeed(source.getPrevSpeed());
+        target.setSpeed(source.getSpeed());
+        target.setPos(source.getPos());
 
+        identity.swinging = player.swinging;
+        identity.swingTime = player.swingTime;
+        identity.oAttackAnim = player.oAttackAnim;
+        identity.attackAnim = player.attackAnim;
 
+        identity.yBodyRot = player.yBodyRot;
+        identity.yBodyRotO = player.yBodyRotO;
+        identity.yHeadRot = player.yHeadRot;
+        identity.yHeadRotO = player.yHeadRotO;
+        identity.tickCount = player.tickCount;
+        identity.swingingArm = player.swingingArm;
 
+        identity.setOnGround(player.onGround());
+        identity.setDeltaMovement(player.getDeltaMovement());
+        ((EntityAccessor) identity).setVehicle(player.getVehicle());
+        ((EntityAccessor) identity).setTouchingWater(player.isInWater());
 
-
-
-
-
-    private void identity_setBipedIdentityModelPose(AbstractClientPlayerEntity player, LivingEntity identity, LivingEntityRenderer identityRenderer) {
-        if (!(identityRenderer.getModel() instanceof BipedEntityModel<?> identityBipedModel)) {
-            return; // Don't crash on non-humanoid models like CodModel
-        }
-
-        if (identity.isSpectator()) {
-            identityBipedModel.setVisible(false);
-            identityBipedModel.head.visible = true;
-            identityBipedModel.hat.visible = true;
+        // Phantoms are rendered upside-down, so pitch must be inverted
+        if (identity instanceof Phantom) {
+            identity.setXRot(-player.getXRot());
+            identity.xRotO = -player.xRotO;
         } else {
-            identityBipedModel.setVisible(true);
-            identityBipedModel.hat.visible = player.isPartVisible(PlayerModelPart.HAT);
-            identityBipedModel.sneaking = identity.isInSneakingPose();
-
-            BipedEntityModel.ArmPose mainHandPose = getArmPose(player, Hand.MAIN_HAND);
-            BipedEntityModel.ArmPose offHandPose = getArmPose(player, Hand.OFF_HAND);
-
-            if (mainHandPose.isTwoHanded()) {
-                offHandPose = identity.getOffHandStack().isEmpty() ? BipedEntityModel.ArmPose.EMPTY : BipedEntityModel.ArmPose.ITEM;
-            }
-
-            if (identity.getMainArm() == Arm.RIGHT) {
-                identityBipedModel.rightArmPose = mainHandPose;
-                identityBipedModel.leftArmPose = offHandPose;
-            } else {
-                identityBipedModel.rightArmPose = offHandPose;
-                identityBipedModel.leftArmPose = mainHandPose;
-            }
+            identity.setXRot(player.getXRot());
+            identity.xRotO = player.xRotO;
         }
+
+        if (IdentityConfig.getInstance().identitiesEquipItems()) {
+            identity.setItemSlot(EquipmentSlot.MAINHAND, player.getItemBySlot(EquipmentSlot.MAINHAND));
+            identity.setItemSlot(EquipmentSlot.OFFHAND, player.getItemBySlot(EquipmentSlot.OFFHAND));
+        }
+
+        if (IdentityConfig.getInstance().identitiesEquipArmor()) {
+            identity.setItemSlot(EquipmentSlot.HEAD, player.getItemBySlot(EquipmentSlot.HEAD));
+            identity.setItemSlot(EquipmentSlot.CHEST, player.getItemBySlot(EquipmentSlot.CHEST));
+            identity.setItemSlot(EquipmentSlot.LEGS, player.getItemBySlot(EquipmentSlot.LEGS));
+            identity.setItemSlot(EquipmentSlot.FEET, player.getItemBySlot(EquipmentSlot.FEET));
+        }
+
+        if (identity instanceof Mob mob) {
+            mob.setAggressive(player.isUsingItem());
+        }
+
+        identity.setPose(player.getPose());
+
+        // startUsingItem before tickActiveItemStack so item-use timer advances correctly
+        InteractionHand hand = player.getUsedItemHand() == null ? InteractionHand.MAIN_HAND : player.getUsedItemHand();
+        identity.startUsingItem(hand);
+        ((LivingEntityAccessor) identity).callSetLivingFlag(1, player.isUsingItem());
+        identity.getTicksUsingItem();
+        ((LivingEntityAccessor) identity).callTickActiveItemStack();
     }
 
     @Inject(
-            method = "getPositionOffset",
+            method = "getRenderOffset(Lnet/minecraft/client/renderer/entity/state/AvatarRenderState;)Lnet/minecraft/world/phys/Vec3;",
             at = @At("HEAD"),
             cancellable = true
     )
-    private void modifyPositionOffset(AbstractClientPlayerEntity player, float f, CallbackInfoReturnable<Vec3d> cir) {
-        LivingEntity identity = PlayerIdentity.getIdentity(player);
-
-        if(identity != null) {
-            if(identity instanceof TameableEntity) {
-                cir.setReturnValue(super.getPositionOffset(player, f));
-            }
+    private void identity_modifyPositionOffset(AvatarRenderState state, CallbackInfoReturnable<Vec3> cir) {
+        // TamableAnimal renderers apply a sitting offset; bypass it so the player stays at ground level
+        if (IdentityRenderCache.cachedIdentity instanceof TamableAnimal) {
+            cir.setReturnValue(super.getRenderOffset(state));
         }
     }
 
+    @SuppressWarnings({"unchecked", "rawtypes"})
     @Inject(
-            method = "renderArm",
-            at = @At("HEAD"), cancellable = true)
-    private void onRenderArm(MatrixStack matrices, VertexConsumerProvider vertexConsumers, int light, AbstractClientPlayerEntity player, ModelPart arm, ModelPart sleeve, CallbackInfo ci) {
-        LivingEntity identity = PlayerIdentity.getIdentity(player);
+            method = "renderRightHand",
+            at = @At("HEAD"),
+            cancellable = true
+    )
+    private void identity_onRenderRightHand(PoseStack poseStack, SubmitNodeCollector collector, int light, Identifier texture, boolean slim, CallbackInfo ci) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null) return;
+        LivingEntity identity = PlayerIdentity.getIdentity(mc.player);
+        if (identity == null) return;
 
-        // sync player data to identity identity
-        if(identity != null) {
-            EntityRenderer<?> renderer = MinecraftClient.getInstance().getEntityRenderDispatcher().getRenderer(identity);
+        EntityRenderer<?, ?> renderer = mc.getEntityRenderDispatcher().getRenderer(identity);
+        if (!(renderer instanceof LivingEntityRenderer livingRenderer)) return;
 
-            if(renderer instanceof LivingEntityRenderer) {
-                LivingEntityRenderer<LivingEntity, ?> rendererCasted = (LivingEntityRenderer<LivingEntity, ?>) renderer;
-                EntityModel model = ((LivingEntityRenderer) renderer).getModel();
+        EntityModel model = livingRenderer.getModel();
+        ModelPart arm = null;
+        ModelPart sleeve = null;
 
-                // re-assign arm & sleeve models
-                arm = null;
-                sleeve = null;
-
-                if(model instanceof PlayerEntityModel) {
-                    arm = ((PlayerEntityModel) model).rightArm;
-                    sleeve = ((PlayerEntityModel) model).rightSleeve;
-                } else if(model instanceof BipedEntityModel) {
-                    arm = ((BipedEntityModel) model).rightArm;
-                    sleeve = null;
-                } else {
-                    Pair<ModelPart, ArmRenderingManipulator<EntityModel>> pair = EntityArms.get(identity, model);
-                    if(pair != null) {
-                        arm = pair.getLeft();
-                        pair.getRight().run(matrices, model);
-                        matrices.translate(0, -.35, .5);
-                    }
-                }
-
-                // assign model properties
-                model.handSwingProgress = 0.0F;
-//                model.sneaking = false;
-//                model.leaningPitch = 0.0F;
-                model.setAngles(identity, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F);
-
-                // render
-                if(arm != null) {
-                    arm.pitch = 0.0F;
-                    arm.render(matrices, vertexConsumers.getBuffer(((LivingEntityRendererAccessor) rendererCasted).callGetRenderLayer(identity, true, false, true)), light, OverlayTexture.DEFAULT_UV);
-                }
-
-                if(sleeve != null) {
-                    sleeve.pitch = 0.0F;
-                    sleeve.render(matrices, vertexConsumers.getBuffer(((LivingEntityRendererAccessor) rendererCasted).callGetRenderLayer(identity, true, false, true)), light, OverlayTexture.DEFAULT_UV);
-                }
-
-                ci.cancel();
+        if (model instanceof PlayerModel playerModel) {
+            arm = playerModel.rightArm;
+            sleeve = playerModel.rightSleeve;
+        } else if (model instanceof HumanoidModel humanoidModel) {
+            arm = humanoidModel.rightArm;
+        } else {
+            Pair<ModelPart, ArmRenderingManipulator<?>> pair = EntityArms.get(identity, model);
+            if (pair != null) {
+                arm = pair.getFirst();
+                ((ArmRenderingManipulator) pair.getSecond()).run(poseStack, model);
+                poseStack.translate(0, -.35, .5);
             }
+        }
+
+        identity_submitArmParts(poseStack, collector, light, identity, renderer, livingRenderer, model, arm, sleeve);
+        ci.cancel();
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    @Inject(
+            method = "renderLeftHand",
+            at = @At("HEAD"),
+            cancellable = true
+    )
+    private void identity_onRenderLeftHand(PoseStack poseStack, SubmitNodeCollector collector, int light, Identifier texture, boolean slim, CallbackInfo ci) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null) return;
+        LivingEntity identity = PlayerIdentity.getIdentity(mc.player);
+        if (identity == null) return;
+
+        EntityRenderer<?, ?> renderer = mc.getEntityRenderDispatcher().getRenderer(identity);
+        if (!(renderer instanceof LivingEntityRenderer livingRenderer)) return;
+
+        EntityModel model = livingRenderer.getModel();
+        ModelPart arm = null;
+        ModelPart sleeve = null;
+
+        if (model instanceof PlayerModel playerModel) {
+            arm = playerModel.leftArm;
+            sleeve = playerModel.leftSleeve;
+        } else if (model instanceof HumanoidModel humanoidModel) {
+            arm = humanoidModel.leftArm;
+        } else {
+            // Non-humanoid models only expose a single arm provider; left arm support is limited
+            Pair<ModelPart, ArmRenderingManipulator<?>> pair = EntityArms.get(identity, model);
+            if (pair != null) {
+                arm = pair.getFirst();
+                ((ArmRenderingManipulator) pair.getSecond()).run(poseStack, model);
+                poseStack.translate(0, -.35, .5);
+            }
+        }
+
+        identity_submitArmParts(poseStack, collector, light, identity, renderer, livingRenderer, model, arm, sleeve);
+        ci.cancel();
+    }
+
+    /**
+     * Animates the identity's model and submits arm + optional sleeve for first-person rendering.
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    @Unique
+    private void identity_submitArmParts(
+            PoseStack poseStack, SubmitNodeCollector collector, int light,
+            LivingEntity identity, EntityRenderer<?, ?> renderer,
+            LivingEntityRenderer livingRenderer, EntityModel model,
+            ModelPart arm, ModelPart sleeve) {
+
+        EntityRenderState renderState = ((EntityRenderer) renderer).createRenderState(identity, 0.0f);
+        model.setupAnim(renderState);
+
+        Identifier identityTexture = livingRenderer.getTextureLocation((LivingEntityRenderState) renderState);
+        if (identityTexture == null) return;
+
+        if (arm != null) {
+            arm.xRot = 0.0F;
+            collector.submitModelPart(arm, poseStack, model.renderType(identityTexture), light, OverlayTexture.NO_OVERLAY, null);
+        }
+        if (sleeve != null) {
+            sleeve.xRot = 0.0F;
+            collector.submitModelPart(sleeve, poseStack, model.renderType(identityTexture), light, OverlayTexture.NO_OVERLAY, null);
         }
     }
 }
