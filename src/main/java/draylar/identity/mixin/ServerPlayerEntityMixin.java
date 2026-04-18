@@ -70,8 +70,8 @@ public abstract class ServerPlayerEntityMixin extends Player {
         }
     }
 
-    @Inject(method = "copyFrom", at = @At("RETURN"))
-    private void identity$restoreAfterRespawn(ServerPlayer oldPlayer, boolean alive, CallbackInfo ci) {
+    @Inject(method = "restoreFrom", at = @At("RETURN"))
+    private void identity$restoreAfterRespawn(ServerPlayer oldPlayer, boolean restoreAll, CallbackInfo ci) {
         PlayerIdentity.sync((ServerPlayer) (Object) this);
     }
 }
