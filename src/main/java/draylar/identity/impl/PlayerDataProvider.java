@@ -1,14 +1,12 @@
 package draylar.identity.impl;
 
 import draylar.identity.api.variant.IdentityType;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.util.Identifier;
-import net.minecraft.nbt.NbtCompound;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.nbt.CompoundTag;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.List;
-import java.util.Set;
 import java.util.Map;
+import java.util.Set;
 
 public interface PlayerDataProvider {
 
@@ -26,13 +24,13 @@ public interface PlayerDataProvider {
 
     LivingEntity getIdentity();
     void setIdentity(@Nullable LivingEntity identity);
-    boolean updateIdentity(@Nullable LivingEntity identity);
+    boolean updateIdentity(@Nullable IdentityType<?> type, @Nullable LivingEntity identity);
 
     IdentityType<?> getIdentityType();
     void setIdentityType(@Nullable IdentityType<?> type);
 
-    Map<String, NbtCompound> getVillagerIdentities();
-    void setVillagerIdentity(String key, NbtCompound identity);
+    Map<String, CompoundTag> getVillagerIdentities();
+    void setVillagerIdentity(String key, CompoundTag identity);
     void removeVillagerIdentity(String key);
 
     @Nullable String getActiveVillagerKey();

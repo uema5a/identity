@@ -1,9 +1,9 @@
 package draylar.identity.compat;
 
-import net.minecraft.entity.EntityDimensions;
-import net.minecraft.entity.EntityPose;
-import net.minecraft.entity.damage.DamageSource;
-import net.minecraft.sound.SoundEvent;
+import net.minecraft.world.entity.EntityDimensions;
+import net.minecraft.world.entity.Pose;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.sounds.SoundEvent;
 
 public interface LivingEntityCompatAccessor {
     boolean isJumping();
@@ -14,19 +14,19 @@ public interface LivingEntityCompatAccessor {
 
     void callPlayBlockFallSound();
 
-    int callComputeFallDamage(float fallDistance, float damageMultiplier);
+    int callCalculateFallDamage(double fallDistance, float damageMultiplier);
 
     float callGetSoundVolume();
 
     float callGetSoundPitch();
 
-    void callSetLivingFlag(int mask, boolean value);
+    void callSetLivingEntityFlag(int mask, boolean value);
 
-    float callGetEyeHeight(EntityPose pose, EntityDimensions dimensions);
+    float callGetEyeHeight(Pose pose, EntityDimensions dimensions);
 
     int identity$getNextAirOnLand(int air);
 
-    float callGetActiveEyeHeight(EntityPose pose, EntityDimensions dimensions);
+    float callGetActiveEyeHeight(Pose pose, EntityDimensions dimensions);
 
     void callTickActiveItemStack();
 }
