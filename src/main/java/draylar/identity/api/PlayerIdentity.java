@@ -1,18 +1,18 @@
 package draylar.identity.api;
 
-import dev.architectury.networking.NetworkManager;
 import draylar.identity.Identity;
 import draylar.identity.api.variant.IdentityType;
 import draylar.identity.impl.PlayerDataProvider;
-import draylar.identity.network.NetworkHandler;
-import io.netty.buffer.Unpooled;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.network.PacketByteBuf;
-import net.minecraft.registry.Registries;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.text.Text;
+import draylar.identity.network.NetworkHandler.IdentitySyncPayload;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.Component;
+import net.minecraft.util.ProblemReporter;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.storage.TagValueOutput;
+import net.minecraft.server.level.ServerPlayer;
 
 import java.lang.reflect.Method;
 import java.util.Map;
@@ -20,29 +20,30 @@ import java.util.Map;
 public class PlayerIdentity {
 
     /**
-     * Returns the identity associated with the {@link PlayerEntity} this component is attached to.
+     * Returns the identity associated with the {@link Player} this component is attached to.
      *
      * <p>Note that this method may return null, which represents "no identity."
      *
      * @return the current {@link LivingEntity} identity associated with this component's player owner, or null if they have no identity equipped
      */
-    public static LivingEntity getIdentity(PlayerEntity player) {
+    public static LivingEntity getIdentity(Player player) {
         return ((PlayerDataProvider) player).getIdentity();
     }
 
-    public static IdentityType<?> getIdentityType(PlayerEntity player) {
+    public static IdentityType<?> getIdentityType(Player player) {
         return ((PlayerDataProvider) player).getIdentityType();
     }
 
-    public static Map<String, NbtCompound> getVillagerIdentities(PlayerEntity player) {
+    // xGabou: villager identity tracking
+    public static Map<String, CompoundTag> getVillagerIdentities(Player player) {
         return ((PlayerDataProvider) player).getVillagerIdentities();
     }
 
-    public static void setVillagerIdentity(PlayerEntity player, String key, NbtCompound identity) {
+    public static void setVillagerIdentity(Player player, String key, CompoundTag identity) {
         ((PlayerDataProvider) player).setVillagerIdentity(key, identity);
     }
 
-    public static void removeVillagerIdentity(PlayerEntity player, String key) {
+    public static void removeVillagerIdentity(Player player, String key) {
         ((PlayerDataProvider) player).removeVillagerIdentity(key);
     }
 
@@ -54,11 +55,11 @@ public class PlayerIdentity {
      *
      * @param entity {@link LivingEntity} new identity for this component, or null to clear
      */
-    public static boolean updateIdentity(ServerPlayerEntity player, IdentityType<?> type, LivingEntity entity) {
+    public static boolean updateIdentity(ServerPlayer player, IdentityType<?> type, LivingEntity entity) {
         // Protect against broken dragons from DragonMounts with null breed
         if(entity == null) {
             ((PlayerDataProvider) player).setIdentityType(type);
-            return ((PlayerDataProvider) player).updateIdentity(null);
+            return ((PlayerDataProvider) player).updateIdentity(type, null);
         }
 
         if(entity.getClass().getName().equals("com.github.kay9.dragonmounts.dragon.TameableDragon")) {
@@ -66,7 +67,7 @@ public class PlayerIdentity {
                 Method getBreed = entity.getClass().getMethod("getBreed");
                 Object breed = getBreed.invoke(entity);
                 if(breed == null) {
-                    player.sendMessage(Text.literal("This dragon identity is broken (no breed). Identity not applied."), false);
+                    player.sendSystemMessage(Component.literal("This dragon identity is broken (no breed). Identity not applied."));
                     return false;
                 }
             } catch (Throwable t) {
@@ -76,29 +77,34 @@ public class PlayerIdentity {
         }
 
         ((PlayerDataProvider) player).setIdentityType(type);
-        return ((PlayerDataProvider) player).updateIdentity(entity);
+        return ((PlayerDataProvider) player).updateIdentity(type, entity);
     }
 
-
-
-    public static void sync(ServerPlayerEntity player) {
+    public static void sync(ServerPlayer player) {
         sync(player, player);
     }
 
-    public static void sync(ServerPlayerEntity changed, ServerPlayerEntity packetTarget) {
-        PacketByteBuf packet = new PacketByteBuf(Unpooled.buffer());
-        NbtCompound entityTag = new NbtCompound();
-
-        // serialize current identity data to tag if it exists
+    public static void sync(ServerPlayer changed, ServerPlayer packetTarget) {
+        // Serialize current identity data to tag if it exists
         LivingEntity identity = getIdentity(changed);
-        if(identity != null) {
-            identity.writeNbt(entityTag);
+        CompoundTag entityTag;
+        if (identity != null) {
+            TagValueOutput output = TagValueOutput.createWithContext(ProblemReporter.DISCARDING, changed.level().registryAccess());
+            identity.saveWithoutId(output);
+            entityTag = output.buildResult();
+        } else {
+            entityTag = new CompoundTag();
         }
 
-        // put entity type ID under the key "id", or "minecraft:empty" if no identity is equipped (or the identity entity type is invalid)
-        packet.writeUuid(changed.getUuid());
-        packet.writeString(identity == null ? "minecraft:empty" : Registries.ENTITY_TYPE.getId(identity.getType()).toString());
-        packet.writeNbt(entityTag);
-        NetworkManager.sendToPlayer(packetTarget, NetworkHandler.IDENTITY_SYNC, packet);
+        // Put entity type ID, or "minecraft:empty" if no identity is equipped
+        String entityTypeId = identity == null
+                ? "minecraft:empty"
+                : BuiltInRegistries.ENTITY_TYPE.getKey(identity.getType()).toString();
+
+        ServerPlayNetworking.send(packetTarget, new IdentitySyncPayload(
+                changed.getUUID(),
+                entityTypeId,
+                entityTag
+        ));
     }
 }

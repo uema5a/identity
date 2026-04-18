@@ -1,8 +1,8 @@
 package draylar.identity.api;
 
-import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.world.entity.player.Player;
 
 @FunctionalInterface
 public interface ApplicablePacket {
-    void apply(PlayerEntity player);
+    void apply(Player player);
 }

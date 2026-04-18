@@ -1,10 +1,10 @@
 package draylar.identity.api.variant;
 
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.text.MutableText;
-import net.minecraft.text.Text;
-import net.minecraft.world.World;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.level.Level;
 
 import java.util.Locale;
 
@@ -16,13 +16,13 @@ public abstract class TypeProvider<T extends LivingEntity> {
 
     public abstract int getVariantData(T entity);
 
-    public abstract T create(EntityType<T> type, World world, int data);
+    public abstract T create(EntityType<T> type, Level level, int data);
 
     public abstract int getFallbackData();
 
     public abstract int getRange();
 
-    public abstract Text modifyText(T entity, MutableText text);
+    public abstract Component modifyText(T entity, MutableComponent text);
 
     public final String formatTypePrefix(String prefix) {
         return String.valueOf(prefix.charAt(0)).toUpperCase(Locale.ROOT) + prefix.substring(1);
