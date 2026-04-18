@@ -8,7 +8,7 @@ import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.npc.Villager;
+import net.minecraft.world.entity.npc.villager.Villager;
 
 import java.util.UUID;
 
@@ -23,7 +23,7 @@ public class VillagerTradePackets {
             UUID targetId = payload.target();
             ServerPlayer requester = context.player();
             context.server().execute(() -> {
-                ServerPlayer target = requester.server.getPlayerList().getPlayer(targetId);
+                ServerPlayer target = context.server().getPlayerList().getPlayer(targetId);
                 if (target != null) {
                     LivingEntity identity = PlayerIdentity.getIdentity(target);
                     if (identity instanceof Villager villager) {
@@ -32,7 +32,7 @@ public class VillagerTradePackets {
                             return;
                         }
                         // Interact with the villager identity to open the trade screen
-                        villager.interact(requester, InteractionHand.MAIN_HAND);
+                        villager.mobInteract(requester, InteractionHand.MAIN_HAND);
                     }
                 }
             });

@@ -213,9 +213,9 @@ public interface NetworkHandler {
         public static final StreamCodec<RegistryFriendlyByteBuf, OpenProfessionScreenPayload> STREAM_CODEC =
                 StreamCodec.of(
                         (buf, payload) -> {
-                            buf.writeResourceLocation(payload.professionId);
+                            buf.writeIdentifier(payload.professionId);
                             buf.writeBlockPos(payload.workstationPos);
-                            buf.writeResourceLocation(payload.worldId);
+                            buf.writeIdentifier(payload.worldId);
                             buf.writeBoolean(payload.hasExisting);
                             if (payload.hasExisting) {
                                 buf.writeUtf(payload.existingName == null ? "" : payload.existingName);
@@ -223,9 +223,9 @@ public interface NetworkHandler {
                             }
                         },
                         buf -> {
-                            Identifier professionId = buf.readResourceLocation();
+                            Identifier professionId = buf.readIdentifier();
                             BlockPos pos = buf.readBlockPos();
-                            Identifier worldId = buf.readResourceLocation();
+                            Identifier worldId = buf.readIdentifier();
                             boolean hasExisting = buf.readBoolean();
                             String existingName = "";
                             String existingProfessionId = "";
@@ -270,22 +270,22 @@ public interface NetworkHandler {
         public static final StreamCodec<RegistryFriendlyByteBuf, SaveProfessionPayload> STREAM_CODEC =
                 StreamCodec.of(
                         (buf, payload) -> {
-                            buf.writeResourceLocation(payload.professionId);
+                            buf.writeIdentifier(payload.professionId);
                             buf.writeUtf(payload.name == null ? "" : payload.name);
                             buf.writeBoolean(payload.reset);
                             buf.writeBlockPos(payload.workstationPos);
-                            buf.writeResourceLocation(payload.worldId);
+                            buf.writeIdentifier(payload.worldId);
                             buf.writeBoolean(payload.hasOriginal);
                             if (payload.hasOriginal) {
                                 buf.writeUtf(payload.originalName == null ? "" : payload.originalName);
                             }
                         },
                         buf -> {
-                            Identifier professionId = buf.readResourceLocation();
+                            Identifier professionId = buf.readIdentifier();
                             String name = buf.readUtf();
                             boolean reset = buf.readBoolean();
                             BlockPos pos = buf.readBlockPos();
-                            Identifier worldId = buf.readResourceLocation();
+                            Identifier worldId = buf.readIdentifier();
                             boolean hasOriginal = buf.readBoolean();
                             String originalName = "";
                             if (hasOriginal) {

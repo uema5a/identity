@@ -3,27 +3,51 @@ package draylar.identity.network.impl;
 import draylar.identity.api.PlayerIdentity;
 import draylar.identity.impl.PlayerDataProvider;
 import draylar.identity.network.NetworkHandler.OpenProfessionScreenPayload;
+import draylar.identity.network.NetworkHandler.SaveProfessionPayload;
+import net.fabricmc.api.EnvType;
+import net.fabricmc.api.Environment;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.village.poi.PoiTypes;
-import net.minecraft.world.entity.npc.Villager;
-import net.minecraft.world.entity.npc.VillagerData;
-import net.minecraft.world.entity.npc.VillagerProfession;
+import net.minecraft.world.entity.npc.villager.Villager;
+import net.minecraft.world.entity.npc.villager.VillagerData;
+import net.minecraft.world.entity.npc.villager.VillagerProfession;
 import net.minecraft.world.level.Level;
-import net.minecraft.nbt.CompoundTag;
+import net.minecraft.world.level.storage.TagValueOutput;
 import net.minecraft.core.particles.ParticleTypes;
 
 import java.util.Map;
 
 public class VillagerProfessionPackets {
+
+    /**
+     * Client-side: send a SaveProfession packet to the server.
+     */
+    @Environment(EnvType.CLIENT)
+    public static void sendSetProfession(Identifier professionId, String name, boolean reset, BlockPos workstationPos, Identifier worldId, String originalName) {
+        boolean hasOriginal = originalName != null;
+        ClientPlayNetworking.send(new SaveProfessionPayload(
+                professionId,
+                name == null ? "" : name,
+                reset,
+                workstationPos,
+                worldId,
+                hasOriginal,
+                hasOriginal ? originalName : ""
+        ));
+    }
 
     public static void openScreen(ServerPlayer player, Identifier professionId, BlockPos pos, Identifier worldId, String existingName, String existingProfessionId) {
         boolean hasExisting = existingName != null;
@@ -79,7 +103,7 @@ public class VillagerProfessionPackets {
         }
 
         ResourceKey<Level> worldKey = ResourceKey.create(Registries.DIMENSION, worldId);
-        ServerLevel world = player.server.getLevel(worldKey);
+        ServerLevel world = ((ServerLevel) player.level()).getServer().getLevel(worldKey);
         if (world == null || !world.dimension().equals(player.level().dimension())) {
             player.sendSystemMessage(Component.translatable("identity.profession.invalid_world"));
             return;
@@ -97,12 +121,24 @@ public class VillagerProfessionPackets {
 
         String professionIdStr = professionId.toString();
         CompoundTag tag = new CompoundTag();
-        VillagerProfession profession =
-                BuiltInRegistries.VILLAGER_PROFESSION.getOptional(professionId)
-                        .orElse(VillagerProfession.NONE);
 
-        villager.setVillagerData(new VillagerData(villager.getVillagerData().getType(), profession, villager.getVillagerData().getLevel()));
-        villager.save(tag);
+        // Set profession using VillagerData.withProfession — looks up Holder from registry
+        Holder<VillagerProfession> professionHolder = BuiltInRegistries.VILLAGER_PROFESSION
+                .get(professionId)
+                .map(ref -> (Holder<VillagerProfession>) ref)
+                .orElse(BuiltInRegistries.VILLAGER_PROFESSION.get(VillagerProfession.NONE).orElse(null));
+
+        if (professionHolder != null) {
+            villager.setVillagerData(villager.getVillagerData().withProfession(professionHolder));
+        }
+
+        // Save villager entity data to CompoundTag via TagValueOutput
+        TagValueOutput output = TagValueOutput.createWithContext(ProblemReporter.DISCARDING, world.registryAccess());
+        villager.save(output);
+        CompoundTag savedData = output.buildResult();
+        // Copy all villager entity data fields we need
+        tag.merge(savedData);
+
         tag.putString("ProfessionId", professionIdStr);
         tag.putString("WorkstationDim", worldId.toString());
         tag.putLong("WorkstationPos", workstationPos);
@@ -131,8 +167,8 @@ public class VillagerProfessionPackets {
         if (tag == null) {
             return false;
         }
-        String dim = tag.getString("WorkstationDim");
-        long storedPos = tag.contains("WorkstationPos") ? tag.getLong("WorkstationPos") : Long.MIN_VALUE;
+        String dim = tag.getStringOr("WorkstationDim", "");
+        long storedPos = tag.contains("WorkstationPos") ? tag.getLongOr("WorkstationPos", Long.MIN_VALUE) : Long.MIN_VALUE;
         return !dim.isEmpty() && storedPos != Long.MIN_VALUE && worldId.toString().equals(dim) && storedPos == workstationPos;
     }
 }

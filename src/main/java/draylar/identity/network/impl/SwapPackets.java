@@ -12,6 +12,7 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.permissions.Permissions;
 import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.EntityType;
@@ -35,9 +36,9 @@ public class SwapPackets {
                 IdentityConfig config = IdentityConfig.getInstance();
 
                 // Ensure player has permission to switch identities
-                if (!config.enableSwaps() && !player.hasPermissions(3) &&
+                if (!config.enableSwaps() && !player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER) &&
                         config.allowedSwappers().stream()
-                                .noneMatch(p -> p.equalsIgnoreCase(player.getGameProfile().getName()))) {
+                                .noneMatch(p -> p.equalsIgnoreCase(player.getGameProfile().name()))) {
                     return;
                 }
 

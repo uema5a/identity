@@ -20,7 +20,6 @@ import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.Minecraft;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.Tag;
 import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.EntityType;
@@ -169,18 +168,18 @@ public class ClientNetworking implements NetworkHandler {
                     Map<String, CompoundTag> villagerIds =
                             (Map<String, CompoundTag>) (Map<?, ?>) data.getVillagerIdentities();
                     villagerIds.clear();
-                    CompoundTag villagerTag = root.getCompound("VillagerIdentities");
-                    for (String key : villagerTag.getAllKeys()) {
+                    CompoundTag villagerTag = root.getCompoundOrEmpty("VillagerIdentities");
+                    for (String key : villagerTag.keySet()) {
                         villagerTag.getCompound(key).ifPresent(tag -> villagerIds.put(key, tag));
                     }
-                    String active = root.contains("ActiveVillagerKey", Tag.TAG_STRING)
-                            ? root.getString("ActiveVillagerKey") : null;
+                    String active = root.contains("ActiveVillagerKey")
+                            ? root.getStringOr("ActiveVillagerKey", "") : null;
                     data.setActiveVillagerKey(active == null || active.isEmpty() ? null : active);
 
                     // Refresh identity screen if open
                     Minecraft mc = Minecraft.getInstance();
                     if (mc.screen instanceof IdentityScreen screen) {
-                        screen.resize(mc, mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight());
+                        screen.resize(mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight());
                     }
                 });
             });
