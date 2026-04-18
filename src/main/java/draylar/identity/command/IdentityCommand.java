@@ -7,31 +7,30 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
 import com.mojang.brigadier.tree.LiteralCommandNode;
-import dev.architectury.event.events.common.CommandRegistrationEvent;
+import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import draylar.identity.api.PlayerIdentity;
 import draylar.identity.api.PlayerUnlocks;
-import draylar.identity.api.platform.IdentityConfig;
-import draylar.identity.api.platform.IdentityPlatform;
+import draylar.identity.config.IdentityConfig;
 import draylar.identity.api.variant.IdentityType;
 import draylar.identity.screen.widget.EntityWidget;
-import net.minecraft.command.CommandRegistryAccess;
-import net.minecraft.command.argument.EntityArgumentType;
-import net.minecraft.command.argument.NbtCompoundArgumentType;
-import net.minecraft.command.argument.RegistryEntryArgumentType;
-import net.minecraft.command.suggestion.SuggestionProviders;
-import net.minecraft.command.CommandSource;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.RegistryKeys;
-import net.minecraft.server.command.CommandManager;
-import net.minecraft.server.command.ServerCommandSource;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
+import CommandBuildContext;
+import net.minecraft.commands.Commands;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.SharedSuggestionProvider;
+import net.minecraft.commands.arguments.EntityArgument;
+import net.minecraft.commands.arguments.CompoundTagArgument;
+import net.minecraft.commands.arguments.ResourceArgument;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -50,16 +49,16 @@ public class IdentityCommand {
     private static final Map<String, Consumer<Float>> FLOAT_SETTERS = new LinkedHashMap<>();
     private static final List<String> STRING_OPTIONS = new ArrayList<>();
 
-    private static final SuggestionProvider<ServerCommandSource> BOOLEAN_OPTION_SUGGESTIONS = (context, builder) -> CommandSource.suggestMatching(BOOLEAN_SETTERS.keySet(), builder);
-    private static final SuggestionProvider<ServerCommandSource> INT_OPTION_SUGGESTIONS = (context, builder) -> CommandSource.suggestMatching(INT_SETTERS.keySet(), builder);
-    private static final SuggestionProvider<ServerCommandSource> FLOAT_OPTION_SUGGESTIONS = (context, builder) -> CommandSource.suggestMatching(FLOAT_SETTERS.keySet(), builder);
-    private static final SuggestionProvider<ServerCommandSource> STRING_OPTION_SUGGESTIONS = (context, builder) -> CommandSource.suggestMatching(STRING_OPTIONS, builder);
+    private static final SuggestionProvider<CommandSourceStack> BOOLEAN_OPTION_SUGGESTIONS = (context, builder) -> SharedSuggestionProvider.suggest(BOOLEAN_SETTERS.keySet(), builder);
+    private static final SuggestionProvider<CommandSourceStack> INT_OPTION_SUGGESTIONS = (context, builder) -> SharedSuggestionProvider.suggest(INT_SETTERS.keySet(), builder);
+    private static final SuggestionProvider<CommandSourceStack> FLOAT_OPTION_SUGGESTIONS = (context, builder) -> SharedSuggestionProvider.suggest(FLOAT_SETTERS.keySet(), builder);
+    private static final SuggestionProvider<CommandSourceStack> STRING_OPTION_SUGGESTIONS = (context, builder) -> SharedSuggestionProvider.suggest(STRING_OPTIONS, builder);
 
-    private static final SuggestionProvider<ServerCommandSource> FORCED_IDENTITY_SUGGESTIONS = (context, builder) -> {
+    private static final SuggestionProvider<CommandSourceStack> FORCED_IDENTITY_SUGGESTIONS = (context, builder) -> {
         List<String> suggestions = new ArrayList<>();
         suggestions.add("none");
-        Registries.ENTITY_TYPE.getIds().forEach(id -> suggestions.add(id.toString()));
-        return CommandSource.suggestMatching(suggestions, builder);
+        BuiltInRegistries.ENTITY_TYPE.keySet().forEach(id -> suggestions.add(id.toString()));
+        return SharedSuggestionProvider.suggest(suggestions, builder);
     };
 
     static {
@@ -101,8 +100,8 @@ public class IdentityCommand {
         STRING_OPTIONS.add("forced_identity");
     }
 
-    private static LiteralArgumentBuilder<ServerCommandSource> createListCommand(CommandRegistryAccess registryAccess) {
-        LiteralArgumentBuilder<ServerCommandSource> listBuilder = CommandManager.literal("list");
+    private static LiteralArgumentBuilder<CommandSourceStack> createListCommand(CommandBuildContext registryAccess) {
+        LiteralArgumentBuilder<CommandSourceStack> listBuilder = Commands.literal("list");
 
         listBuilder.then(createStringListNode("allowed_swappers", () -> IdentityConfig.getInstance().allowedSwappers(), true, "player"));
         listBuilder.then(createStringListNode("advancements_required_for_flight", () -> IdentityConfig.getInstance().advancementsRequiredForFlight(), false, "advancement"));
@@ -114,8 +113,8 @@ public class IdentityCommand {
         return listBuilder;
     }
 
-    private static LiteralArgumentBuilder<ServerCommandSource> createMapCommand(CommandRegistryAccess registryAccess) {
-        LiteralArgumentBuilder<ServerCommandSource> mapBuilder = CommandManager.literal("map");
+    private static LiteralArgumentBuilder<CommandSourceStack> createMapCommand(CommandBuildContext registryAccess) {
+        LiteralArgumentBuilder<CommandSourceStack> mapBuilder = Commands.literal("map");
 
         mapBuilder.then(createAbilityCooldownCommands(registryAccess));
         mapBuilder.then(createRequiredKillCommands(registryAccess));
@@ -123,86 +122,86 @@ public class IdentityCommand {
         return mapBuilder;
     }
 
-    private static LiteralArgumentBuilder<ServerCommandSource> createStringListNode(String literal, Supplier<List<String>> listSupplier, boolean caseInsensitive, String valueArgumentName) {
-        return CommandManager.literal(literal)
-                .then(CommandManager.literal("add")
-                        .then(CommandManager.argument(valueArgumentName, StringArgumentType.string())
+    private static LiteralArgumentBuilder<CommandSourceStack> createStringListNode(String literal, Supplier<List<String>> listSupplier, boolean caseInsensitive, String valueArgumentName) {
+        return Commands.literal(literal)
+                .then(Commands.literal("add")
+                        .then(Commands.argument(valueArgumentName, StringArgumentType.string())
                                 .executes(ctx -> addToList(ctx.getSource(), listSupplier, caseInsensitive, literal, StringArgumentType.getString(ctx, valueArgumentName)))))
-                .then(CommandManager.literal("remove")
-                        .then(CommandManager.argument(valueArgumentName, StringArgumentType.string())
-                                .suggests((context, builder) -> CommandSource.suggestMatching(new ArrayList<>(listSupplier.get()), builder))
+                .then(Commands.literal("remove")
+                        .then(Commands.argument(valueArgumentName, StringArgumentType.string())
+                                .suggests((context, builder) -> SharedSuggestionProvider.suggest(new ArrayList<>(listSupplier.get()), builder))
                                 .executes(ctx -> removeFromList(ctx.getSource(), listSupplier, caseInsensitive, literal, StringArgumentType.getString(ctx, valueArgumentName)))))
-                .then(CommandManager.literal("clear")
+                .then(Commands.literal("clear")
                         .executes(ctx -> clearList(ctx.getSource(), listSupplier, literal)));
     }
 
-    private static LiteralArgumentBuilder<ServerCommandSource> createEntityListNode(String literal, Supplier<List<String>> listSupplier, CommandRegistryAccess registryAccess) {
-        return CommandManager.literal(literal)
-                .then(CommandManager.literal("add")
-                        .then(CommandManager.argument("entity", RegistryEntryArgumentType.registryEntry(registryAccess, RegistryKeys.ENTITY_TYPE)).suggests(SuggestionProviders.SUMMONABLE_ENTITIES)
+    private static LiteralArgumentBuilder<CommandSourceStack> createEntityListNode(String literal, Supplier<List<String>> listSupplier, CommandBuildContext registryAccess) {
+        return Commands.literal(literal)
+                .then(Commands.literal("add")
+                        .then(Commands.argument("entity", ResourceArgument.resource(registryAccess, Registries.ENTITY_TYPE))
                                 .executes(ctx -> {
-                                    Identifier id = RegistryEntryArgumentType.getSummonableEntityType(ctx, "entity").registryKey().getValue();
+                                    Identifier id = ResourceArgument.getSummonableEntityType(ctx, "entity").key().identifier();
                                     return addToList(ctx.getSource(), listSupplier, false, literal, id.toString());
                                 })))
-                .then(CommandManager.literal("remove")
-                        .then(CommandManager.argument("entity", StringArgumentType.string())
-                                .suggests((context, builder) -> CommandSource.suggestMatching(new ArrayList<>(listSupplier.get()), builder))
+                .then(Commands.literal("remove")
+                        .then(Commands.argument("entity", StringArgumentType.string())
+                                .suggests((context, builder) -> SharedSuggestionProvider.suggest(new ArrayList<>(listSupplier.get()), builder))
                                 .executes(ctx -> removeFromList(ctx.getSource(), listSupplier, false, literal, StringArgumentType.getString(ctx, "entity")))))
-                .then(CommandManager.literal("clear")
+                .then(Commands.literal("clear")
                         .executes(ctx -> clearList(ctx.getSource(), listSupplier, literal)));
     }
 
-    private static LiteralArgumentBuilder<ServerCommandSource> createAbilityCooldownCommands(CommandRegistryAccess registryAccess) {
-        return CommandManager.literal("ability_cooldowns")
-                .then(CommandManager.literal("set")
-                        .then(CommandManager.argument("entity", RegistryEntryArgumentType.registryEntry(registryAccess, RegistryKeys.ENTITY_TYPE)).suggests(SuggestionProviders.SUMMONABLE_ENTITIES)
-                                .then(CommandManager.argument("cooldown", IntegerArgumentType.integer(0))
+    private static LiteralArgumentBuilder<CommandSourceStack> createAbilityCooldownCommands(CommandBuildContext registryAccess) {
+        return Commands.literal("ability_cooldowns")
+                .then(Commands.literal("set")
+                        .then(Commands.argument("entity", ResourceArgument.resource(registryAccess, Registries.ENTITY_TYPE))
+                                .then(Commands.argument("cooldown", IntegerArgumentType.integer(0))
                                         .executes(ctx -> {
-                                            Identifier id = RegistryEntryArgumentType.getSummonableEntityType(ctx, "entity").registryKey().getValue();
+                                            Identifier id = ResourceArgument.getSummonableEntityType(ctx, "entity").key().identifier();
                                             int cooldown = IntegerArgumentType.getInteger(ctx, "cooldown");
                                             return setAbilityCooldown(ctx.getSource(), id.toString(), cooldown);
                                         }))))
-                .then(CommandManager.literal("remove")
-                        .then(CommandManager.argument("entity", StringArgumentType.string())
-                                .suggests((context, builder) -> CommandSource.suggestMatching(IdentityConfig.getInstance().getAbilityCooldownMap().keySet(), builder))
+                .then(Commands.literal("remove")
+                        .then(Commands.argument("entity", StringArgumentType.string())
+                                .suggests((context, builder) -> SharedSuggestionProvider.suggest(IdentityConfig.getInstance().getAbilityCooldownMap().keySet(), builder))
                                 .executes(ctx -> removeAbilityCooldown(ctx.getSource(), StringArgumentType.getString(ctx, "entity")))))
-                .then(CommandManager.literal("clear")
+                .then(Commands.literal("clear")
                         .executes(ctx -> clearAbilityCooldowns(ctx.getSource())));
     }
 
-    private static LiteralArgumentBuilder<ServerCommandSource> createRequiredKillCommands(CommandRegistryAccess registryAccess) {
-        return CommandManager.literal("required_kills")
-                .then(CommandManager.literal("set")
-                        .then(CommandManager.argument("entity", RegistryEntryArgumentType.registryEntry(registryAccess, RegistryKeys.ENTITY_TYPE)).suggests(SuggestionProviders.SUMMONABLE_ENTITIES)
-                                .then(CommandManager.argument("kills", IntegerArgumentType.integer(0))
+    private static LiteralArgumentBuilder<CommandSourceStack> createRequiredKillCommands(CommandBuildContext registryAccess) {
+        return Commands.literal("required_kills")
+                .then(Commands.literal("set")
+                        .then(Commands.argument("entity", ResourceArgument.resource(registryAccess, Registries.ENTITY_TYPE))
+                                .then(Commands.argument("kills", IntegerArgumentType.integer(0))
                                         .executes(ctx -> {
-                                            Identifier id = RegistryEntryArgumentType.getSummonableEntityType(ctx, "entity").registryKey().getValue();
+                                            Identifier id = ResourceArgument.getSummonableEntityType(ctx, "entity").key().identifier();
                                             int kills = IntegerArgumentType.getInteger(ctx, "kills");
                                             return setRequiredKillOverride(ctx.getSource(), id.toString(), kills);
                                         }))))
-                .then(CommandManager.literal("remove")
-                        .then(CommandManager.argument("entity", StringArgumentType.string())
-                                .suggests((context, builder) -> CommandSource.suggestMatching(IdentityConfig.getInstance().getRequiredKillsByType().keySet(), builder))
+                .then(Commands.literal("remove")
+                        .then(Commands.argument("entity", StringArgumentType.string())
+                                .suggests((context, builder) -> SharedSuggestionProvider.suggest(IdentityConfig.getInstance().getRequiredKillsByType().keySet(), builder))
                                 .executes(ctx -> removeRequiredKillOverride(ctx.getSource(), StringArgumentType.getString(ctx, "entity")))))
-                .then(CommandManager.literal("clear")
+                .then(Commands.literal("clear")
                         .executes(ctx -> clearRequiredKillOverrides(ctx.getSource())));
     }
 
-    private static int addToList(ServerCommandSource source, Supplier<List<String>> supplier, boolean caseInsensitive, String listName, String value) {
+    private static int addToList(CommandSourceStack source, Supplier<List<String>> supplier, boolean caseInsensitive, String listName, String value) {
         List<String> list = supplier.get();
         boolean exists = caseInsensitive ? list.stream().anyMatch(entry -> entry.equalsIgnoreCase(value)) : list.contains(value);
 
         if (exists) {
-            source.sendError(Text.literal(value + " is already present in " + formatKey(listName)));
+            source.sendFailure(Component.literal(value + " is already present in " + formatKey(listName)));
             return 0;
         }
 
         list.add(value);
-        persistConfig(source, Text.literal("Added " + value + " to " + formatKey(listName)));
+        persistConfig(source, Component.literal("Added " + value + " to " + formatKey(listName)));
         return 1;
     }
 
-    private static int removeFromList(ServerCommandSource source, Supplier<List<String>> supplier, boolean caseInsensitive, String listName, String value) {
+    private static int removeFromList(CommandSourceStack source, Supplier<List<String>> supplier, boolean caseInsensitive, String listName, String value) {
         List<String> list = supplier.get();
         boolean removed;
 
@@ -213,207 +212,198 @@ public class IdentityCommand {
         }
 
         if (!removed) {
-            source.sendError(Text.literal(value + " is not present in " + formatKey(listName)));
+            source.sendFailure(Component.literal(value + " is not present in " + formatKey(listName)));
             return 0;
         }
 
-        persistConfig(source, Text.literal("Removed " + value + " from " + formatKey(listName)));
+        persistConfig(source, Component.literal("Removed " + value + " from " + formatKey(listName)));
         return 1;
     }
 
-    private static int clearList(ServerCommandSource source, Supplier<List<String>> supplier, String listName) {
+    private static int clearList(CommandSourceStack source, Supplier<List<String>> supplier, String listName) {
         List<String> list = supplier.get();
 
         if (list.isEmpty()) {
-            source.sendFeedback(() -> Text.literal(formatKey(listName) + " is already empty"), false);
+            source.sendSuccess(() -> Component.literal(formatKey(listName) + " is already empty"), false);
             return 0;
         }
 
         list.clear();
-        persistConfig(source, Text.literal("Cleared " + formatKey(listName)));
+        persistConfig(source, Component.literal("Cleared " + formatKey(listName)));
         return 1;
     }
 
-    private static int setAbilityCooldown(ServerCommandSource source, String entityId, int cooldown) {
+    private static int setAbilityCooldown(CommandSourceStack source, String entityId, int cooldown) {
         IdentityConfig.getInstance().getAbilityCooldownMap().put(entityId, cooldown);
-        persistConfig(source, Text.literal("Set ability cooldown for " + entityId + " to " + cooldown));
+        persistConfig(source, Component.literal("Set ability cooldown for " + entityId + " to " + cooldown));
         return 1;
     }
 
-    private static int removeAbilityCooldown(ServerCommandSource source, String entityId) {
+    private static int removeAbilityCooldown(CommandSourceStack source, String entityId) {
         Integer removed = IdentityConfig.getInstance().getAbilityCooldownMap().remove(entityId);
         if (removed == null) {
-            source.sendError(Text.literal("No ability cooldown override exists for " + entityId));
+            source.sendFailure(Component.literal("No ability cooldown override exists for " + entityId));
             return 0;
         }
 
-        persistConfig(source, Text.literal("Removed ability cooldown override for " + entityId));
+        persistConfig(source, Component.literal("Removed ability cooldown override for " + entityId));
         return 1;
     }
 
-    private static int clearAbilityCooldowns(ServerCommandSource source) {
+    private static int clearAbilityCooldowns(CommandSourceStack source) {
         Map<String, Integer> map = IdentityConfig.getInstance().getAbilityCooldownMap();
         if (map.isEmpty()) {
-            source.sendFeedback(() -> Text.literal("Ability cooldown overrides are already empty"), false);
+            source.sendSuccess(() -> Component.literal("Ability cooldown overrides are already empty"), false);
             return 0;
         }
 
         map.clear();
-        persistConfig(source, Text.literal("Cleared all ability cooldown overrides"));
+        persistConfig(source, Component.literal("Cleared all ability cooldown overrides"));
         return 1;
     }
 
-    private static int setRequiredKillOverride(ServerCommandSource source, String entityId, int kills) {
+    private static int setRequiredKillOverride(CommandSourceStack source, String entityId, int kills) {
         IdentityConfig.getInstance().getRequiredKillsByType().put(entityId, kills);
-        persistConfig(source, Text.literal("Set required kills for " + entityId + " to " + kills));
+        persistConfig(source, Component.literal("Set required kills for " + entityId + " to " + kills));
         return 1;
     }
 
-    private static int removeRequiredKillOverride(ServerCommandSource source, String entityId) {
+    private static int removeRequiredKillOverride(CommandSourceStack source, String entityId) {
         Integer removed = IdentityConfig.getInstance().getRequiredKillsByType().remove(entityId);
         if (removed == null) {
-            source.sendError(Text.literal("No required kill override exists for " + entityId));
+            source.sendFailure(Component.literal("No required kill override exists for " + entityId));
             return 0;
         }
 
-        persistConfig(source, Text.literal("Removed required kill override for " + entityId));
+        persistConfig(source, Component.literal("Removed required kill override for " + entityId));
         return 1;
     }
 
-    private static int clearRequiredKillOverrides(ServerCommandSource source) {
+    private static int clearRequiredKillOverrides(CommandSourceStack source) {
         Map<String, Integer> map = IdentityConfig.getInstance().getRequiredKillsByType();
         if (map.isEmpty()) {
-            source.sendFeedback(() -> Text.literal("Required kill overrides are already empty"), false);
+            source.sendSuccess(() -> Component.literal("Required kill overrides are already empty"), false);
             return 0;
         }
 
         map.clear();
-        persistConfig(source, Text.literal("Cleared all required kill overrides"));
+        persistConfig(source, Component.literal("Cleared all required kill overrides"));
         return 1;
     }
 
-    private static int setBooleanOption(ServerCommandSource source, String option, boolean value) {
+    private static int setBooleanOption(CommandSourceStack source, String option, boolean value) {
         String key = option.toLowerCase(Locale.ROOT);
         Consumer<Boolean> setter = BOOLEAN_SETTERS.get(key);
 
         if (setter == null) {
-            source.sendError(Text.literal("Unknown boolean option: " + option));
+            source.sendFailure(Component.literal("Unknown boolean option: " + option));
             return 0;
         }
 
         setter.accept(value);
-        persistConfig(source, Text.literal("Set " + formatKey(key) + " to " + value));
+        persistConfig(source, Component.literal("Set " + formatKey(key) + " to " + value));
         return 1;
     }
 
-    private static int setIntegerOption(ServerCommandSource source, String option, int value) {
+    private static int setIntegerOption(CommandSourceStack source, String option, int value) {
         String key = option.toLowerCase(Locale.ROOT);
         IntConsumer setter = INT_SETTERS.get(key);
 
         if (setter == null) {
-            source.sendError(Text.literal("Unknown integer option: " + option));
+            source.sendFailure(Component.literal("Unknown integer option: " + option));
             return 0;
         }
 
         if ("max_health".equals(key) && value < 1) {
-            source.sendError(Text.literal("max health must be at least 1"));
+            source.sendFailure(Component.literal("max health must be at least 1"));
             return 0;
         }
 
         setter.accept(value);
-        persistConfig(source, Text.literal("Set " + formatKey(key) + " to " + value));
+        persistConfig(source, Component.literal("Set " + formatKey(key) + " to " + value));
         return 1;
     }
 
-    private static int setFloatOption(ServerCommandSource source, String option, float value) {
+    private static int setFloatOption(CommandSourceStack source, String option, float value) {
         String key = option.toLowerCase(Locale.ROOT);
         Consumer<Float> setter = FLOAT_SETTERS.get(key);
 
         if (setter == null) {
-            source.sendError(Text.literal("Unknown float option: " + option));
+            source.sendFailure(Component.literal("Unknown float option: " + option));
             return 0;
         }
 
         if (value <= 0) {
-            source.sendError(Text.literal("fly speed must be greater than 0"));
+            source.sendFailure(Component.literal("fly speed must be greater than 0"));
             return 0;
         }
 
         setter.accept(value);
-        persistConfig(source, Text.literal("Set " + formatKey(key) + " to " + value));
+        persistConfig(source, Component.literal("Set " + formatKey(key) + " to " + value));
         return 1;
     }
 
-    private static int setStringOption(ServerCommandSource source, String option, String rawValue) {
+    private static int setStringOption(CommandSourceStack source, String option, String rawValue) {
         String key = option.toLowerCase(Locale.ROOT);
 
         if (!STRING_OPTIONS.contains(key)) {
-            source.sendError(Text.literal("Unknown string option: " + option));
+            source.sendFailure(Component.literal("Unknown string option: " + option));
             return 0;
         }
 
         if ("forced_identity".equals(key)) {
             if (rawValue.equalsIgnoreCase("none") || rawValue.equalsIgnoreCase("null")) {
                 IdentityConfig.getInstance().setForcedIdentity(null);
-                persistConfig(source, Text.literal("Cleared forced identity"));
+                persistConfig(source, Component.literal("Cleared forced identity"));
                 return 1;
             }
 
             Identifier identifier = Identifier.tryParse(rawValue);
-            if (identifier == null || !Registries.ENTITY_TYPE.containsId(identifier)) {
-                source.sendError(Text.literal("Unknown entity: " + rawValue));
+            if (identifier == null || !BuiltInRegistries.ENTITY_TYPE.containsKey(identifier)) {
+                source.sendFailure(Component.literal("Unknown entity: " + rawValue));
                 return 0;
             }
 
             IdentityConfig.getInstance().setForcedIdentity(identifier.toString());
-            persistConfig(source, Text.literal("Set forced identity to " + identifier));
+            persistConfig(source, Component.literal("Set forced identity to " + identifier));
             return 1;
         }
 
         return 0;
     }
 
-    private static int reloadConfig(ServerCommandSource source) {
-        if (IdentityPlatform.getReloader() == null) {
-            source.sendError(Text.literal("No config reloader is registered"));
-            return 0;
-        }
-
-        IdentityPlatform.getReloader().reloadConfig();
-        source.sendFeedback(() -> Text.literal("Reloaded Identity config"), true);
+    private static int reloadConfig(CommandSourceStack source) {
+        IdentityConfig.load();
+        source.sendSuccess(() -> Component.literal("Reloaded Identity config"), true);
         return 1;
     }
 
-    private static void persistConfig(ServerCommandSource source, Text message) {
-        source.sendFeedback(() -> message, true);
-
-        if (IdentityPlatform.getReloader() != null) {
-            IdentityPlatform.getReloader().saveConfig();
-        } else {
-            source.sendError(Text.literal("Unable to save config changes because no reloader is registered"));
-        }
+    private static void persistConfig(CommandSourceStack source, Component message) {
+        source.sendSuccess(() -> message, true);
+        IdentityConfig.save();
     }
 
     private static String formatKey(String key) {
         return key.replace('_', ' ');
     }
+
     public static void register() {
-        CommandRegistrationEvent.EVENT.register((dispatcher, registryAccess, b) -> {
-            LiteralCommandNode<ServerCommandSource> rootNode = CommandManager
+        CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
+            LiteralCommandNode<CommandSourceStack> rootNode = Commands
                     .literal("identity")
-                    .requires(source -> source.hasPermissionLevel(2))
+                    .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
                     .build();
 
             /*
             Used to give the specified Identity to the specified Player.
              */
-            LiteralCommandNode<ServerCommandSource> grantNode = CommandManager
+            LiteralCommandNode<CommandSourceStack> grantNode = Commands
                     .literal("grant")
-                    .then(CommandManager.argument("player", EntityArgumentType.players())
-                            .then(CommandManager.literal("everything")
+                    .then(Commands.argument("player", EntityArgument.players())
+                            .then(Commands.literal("everything")
                                     .executes(context -> {
-                                        ServerPlayerEntity player = EntityArgumentType.getPlayer(context, "player");
-                                        for (IdentityType<?> type : IdentityType.getAllTypes(player.getWorld())) {
+                                        ServerPlayer player = EntityArgument.getPlayer(context, "player");
+                                        for (IdentityType<?> type : IdentityType.getAllTypes(player.level())) {
                                             if(!PlayerUnlocks.has(player, type)) {
                                                 PlayerUnlocks.unlock(player, type);
                                             }
@@ -422,24 +412,24 @@ public class IdentityCommand {
                                         return 1;
                                     })
                             )
-                            .then(CommandManager.argument("identity", RegistryEntryArgumentType.registryEntry(registryAccess, RegistryKeys.ENTITY_TYPE)).suggests(SuggestionProviders.SUMMONABLE_ENTITIES)
+                            .then(Commands.argument("identity", ResourceArgument.resource(registryAccess, Registries.ENTITY_TYPE))
                                     .executes(context -> {
                                         grant(
                                                 context.getSource().getPlayer(),
-                                                EntityArgumentType.getPlayer(context, "player"),
-                                                RegistryEntryArgumentType.getSummonableEntityType(context, "identity").registryKey().getValue(),
+                                                EntityArgument.getPlayer(context, "player"),
+                                                ResourceArgument.getSummonableEntityType(context, "identity").key().identifier(),
                                                 null
                                         );
                                         return 1;
                                     })
-                                    .then(CommandManager.argument("nbt", NbtCompoundArgumentType.nbtCompound())
+                                    .then(Commands.argument("nbt", CompoundTagArgument.compoundTag())
                                             .executes(context -> {
-                                                NbtCompound nbt = NbtCompoundArgumentType.getNbtCompound(context, "nbt");
+                                                CompoundTag nbt = CompoundTagArgument.getCompoundTag(context, "nbt");
 
                                                 grant(
                                                         context.getSource().getPlayer(),
-                                                        EntityArgumentType.getPlayer(context, "player"),
-                                                        RegistryEntryArgumentType.getSummonableEntityType(context, "identity").registryKey().getValue(),
+                                                        EntityArgument.getPlayer(context, "player"),
+                                                        ResourceArgument.getSummonableEntityType(context, "identity").key().identifier(),
                                                         nbt
                                                 );
 
@@ -450,13 +440,13 @@ public class IdentityCommand {
                     )
                     .build();
 
-            LiteralCommandNode<ServerCommandSource> revokeNode = CommandManager
+            LiteralCommandNode<CommandSourceStack> revokeNode = Commands
                     .literal("revoke")
-                    .then(CommandManager.argument("player", EntityArgumentType.players())
-                            .then(CommandManager.literal("everything")
+                    .then(Commands.argument("player", EntityArgument.players())
+                            .then(Commands.literal("everything")
                                     .executes(context -> {
-                                        ServerPlayerEntity player = EntityArgumentType.getPlayer(context, "player");
-                                        for (IdentityType<?> type : IdentityType.getAllTypes(player.getWorld())) {
+                                        ServerPlayer player = EntityArgument.getPlayer(context, "player");
+                                        for (IdentityType<?> type : IdentityType.getAllTypes(player.level())) {
                                             if(PlayerUnlocks.has(player, type)) {
                                                 PlayerUnlocks.revoke(player, type);
                                             }
@@ -465,24 +455,24 @@ public class IdentityCommand {
                                         return 1;
                                     })
                             )
-                            .then(CommandManager.argument("identity", RegistryEntryArgumentType.registryEntry(registryAccess, RegistryKeys.ENTITY_TYPE)).suggests(SuggestionProviders.SUMMONABLE_ENTITIES)
+                            .then(Commands.argument("identity", ResourceArgument.resource(registryAccess, Registries.ENTITY_TYPE))
                                     .executes(context -> {
                                         revoke(
                                                 context.getSource().getPlayer(),
-                                                EntityArgumentType.getPlayer(context, "player"),
-                                                RegistryEntryArgumentType.getSummonableEntityType(context, "identity").registryKey().getValue(),
+                                                EntityArgument.getPlayer(context, "player"),
+                                                ResourceArgument.getSummonableEntityType(context, "identity").key().identifier(),
                                                 null
                                         );
                                         return 1;
                                     })
-                                    .then(CommandManager.argument("nbt", NbtCompoundArgumentType.nbtCompound())
+                                    .then(Commands.argument("nbt", CompoundTagArgument.compoundTag())
                                             .executes(context -> {
-                                                NbtCompound nbt = NbtCompoundArgumentType.getNbtCompound(context, "nbt");
+                                                CompoundTag nbt = CompoundTagArgument.getCompoundTag(context, "nbt");
 
                                                 revoke(
                                                         context.getSource().getPlayer(),
-                                                        EntityArgumentType.getPlayer(context, "player"),
-                                                        RegistryEntryArgumentType.getSummonableEntityType(context, "identity").registryKey().getValue(),
+                                                        EntityArgument.getPlayer(context, "player"),
+                                                        ResourceArgument.getSummonableEntityType(context, "identity").key().identifier(),
                                                         nbt
                                                 );
 
@@ -493,25 +483,25 @@ public class IdentityCommand {
                     )
                     .build();
 
-            LiteralCommandNode<ServerCommandSource> equip = CommandManager
+            LiteralCommandNode<CommandSourceStack> equip = Commands
                     .literal("equip")
-                    .then(CommandManager.argument("player", EntityArgumentType.players())
-                            .then(CommandManager.argument("identity", RegistryEntryArgumentType.registryEntry(registryAccess, RegistryKeys.ENTITY_TYPE)).suggests(SuggestionProviders.SUMMONABLE_ENTITIES)
+                    .then(Commands.argument("player", EntityArgument.players())
+                            .then(Commands.argument("identity", ResourceArgument.resource(registryAccess, Registries.ENTITY_TYPE))
                                     .executes(context -> {
                                         equip(context.getSource().getPlayer(),
-                                                EntityArgumentType.getPlayer(context, "player"),
-                                                RegistryEntryArgumentType.getSummonableEntityType(context, "identity").registryKey().getValue(),
+                                                EntityArgument.getPlayer(context, "player"),
+                                                ResourceArgument.getSummonableEntityType(context, "identity").key().identifier(),
                                                 null);
 
                                         return 1;
                                     })
-                                    .then(CommandManager.argument("nbt", NbtCompoundArgumentType.nbtCompound())
+                                    .then(Commands.argument("nbt", CompoundTagArgument.compoundTag())
                                             .executes(context -> {
-                                                NbtCompound nbt = NbtCompoundArgumentType.getNbtCompound(context, "nbt");
+                                                CompoundTag nbt = CompoundTagArgument.getCompoundTag(context, "nbt");
 
                                                 equip(context.getSource().getPlayer(),
-                                                        EntityArgumentType.getPlayer(context, "player"),
-                                                        RegistryEntryArgumentType.getSummonableEntityType(context, "identity").registryKey().getValue(),
+                                                        EntityArgument.getPlayer(context, "player"),
+                                                        ResourceArgument.getSummonableEntityType(context, "identity").key().identifier(),
                                                         nbt);
 
                                                 return 1;
@@ -521,119 +511,120 @@ public class IdentityCommand {
                     )
                     .build();
 
-            LiteralCommandNode<ServerCommandSource> unequip = CommandManager
+            LiteralCommandNode<CommandSourceStack> unequip = Commands
                     .literal("unequip")
-                    .then(CommandManager.argument("player", EntityArgumentType.players())
+                    .then(Commands.argument("player", EntityArgument.players())
                             .executes(context -> {
                                 unequip(
                                         context.getSource().getPlayer(),
-                                        EntityArgumentType.getPlayer(context, "player")
+                                        EntityArgument.getPlayer(context, "player")
                                 );
                                 return 1;
                             })
                     )
                     .build();
 
-            LiteralCommandNode<ServerCommandSource> test = CommandManager
+            LiteralCommandNode<CommandSourceStack> test = Commands
                     .literal("test")
-                    .then(CommandManager.argument("player", EntityArgumentType.player())
-                            .then(CommandManager.literal("not")
-                                    .then(CommandManager.argument("identity", RegistryEntryArgumentType.registryEntry(registryAccess, RegistryKeys.ENTITY_TYPE)).suggests(SuggestionProviders.SUMMONABLE_ENTITIES)
+                    .then(Commands.argument("player", EntityArgument.player())
+                            .then(Commands.literal("not")
+                                    .then(Commands.argument("identity", ResourceArgument.resource(registryAccess, Registries.ENTITY_TYPE))
                                             .executes(context -> {
                                                 return testNot(
                                                         context.getSource().getPlayer(),
-                                                        EntityArgumentType.getPlayer(context, "player"),
-                                                        RegistryEntryArgumentType.getSummonableEntityType(context, "identity").registryKey().getValue()
+                                                        EntityArgument.getPlayer(context, "player"),
+                                                        ResourceArgument.getSummonableEntityType(context, "identity").key().identifier()
                                                 );
                                             })
                                     )
                             )
-                            .then(CommandManager.argument("identity", RegistryEntryArgumentType.registryEntry(registryAccess, RegistryKeys.ENTITY_TYPE)).suggests(SuggestionProviders.SUMMONABLE_ENTITIES)
+                            .then(Commands.argument("identity", ResourceArgument.resource(registryAccess, Registries.ENTITY_TYPE))
                                     .executes(context -> {
                                         return test(
                                                 context.getSource().getPlayer(),
-                                                EntityArgumentType.getPlayer(context, "player"),
-                                                RegistryEntryArgumentType.getSummonableEntityType(context, "identity").registryKey().getValue()
+                                                EntityArgument.getPlayer(context, "player"),
+                                                ResourceArgument.getSummonableEntityType(context, "identity").key().identifier()
                                         );
                                     })
                             )
                     )
                     .build();
-            LiteralCommandNode<ServerCommandSource> offsetNode =
-                    CommandManager.literal("offset")
-                            .then(CommandManager.argument("value", IntegerArgumentType.integer())
+
+            LiteralCommandNode<CommandSourceStack> offsetNode =
+                    Commands.literal("offset")
+                            .then(Commands.argument("value", IntegerArgumentType.integer())
                                     .executes(ctx -> {
                                         int v = IntegerArgumentType.getInteger(ctx, "value");
                                         EntityWidget.VERTICAL_OFFSET = v;
                                         ctx.getSource()
-                                                .sendFeedback(
-                                                        ()-> Text.literal("Entity‑grid Y‑offset set to §e" + v + "§r"),
+                                                .sendSuccess(
+                                                        () -> Component.literal("Entity-grid Y-offset set to §e" + v + "§r"),
                                                         false
                                                 );
                                         return 1;
                                     })
                             ).build();
 
-            LiteralCommandNode<ServerCommandSource> whitelistNode =
-                    CommandManager.literal("whitelist")
-                            .then(CommandManager.literal("enable")
+            LiteralCommandNode<CommandSourceStack> whitelistNode =
+                    Commands.literal("whitelist")
+                            .then(Commands.literal("enable")
                                     .executes(ctx -> {
                                         IdentityConfig.getInstance().setEnableSwaps(false);
                                         if (IdentityConfig.getInstance().logCommands()) {
-                                            ctx.getSource().sendFeedback(() -> Text.literal("Enabled identity whitelist"), true);
+                                            ctx.getSource().sendSuccess(() -> Component.literal("Enabled identity whitelist"), true);
                                         }
                                         return 1;
                                     }))
-                            .then(CommandManager.literal("disable")
+                            .then(Commands.literal("disable")
                                     .executes(ctx -> {
                                         IdentityConfig.getInstance().setEnableSwaps(true);
                                         if (IdentityConfig.getInstance().logCommands()) {
-                                            ctx.getSource().sendFeedback(() -> Text.literal("Disabled identity whitelist"), true);
+                                            ctx.getSource().sendSuccess(() -> Component.literal("Disabled identity whitelist"), true);
                                         }
                                         return 1;
                                     }))
-                            .then(CommandManager.literal("add")
-                                    .then(CommandManager.argument("player", StringArgumentType.string())
+                            .then(Commands.literal("add")
+                                    .then(Commands.argument("player", StringArgumentType.string())
                                             .executes(ctx -> {
                                                 String name = StringArgumentType.getString(ctx, "player");
                                                 IdentityConfig.getInstance().allowedSwappers().add(name);
                                                 if (IdentityConfig.getInstance().logCommands()) {
-                                                    ctx.getSource().sendFeedback(() -> Text.literal("Added " + name + " to identity whitelist"), true);
+                                                    ctx.getSource().sendSuccess(() -> Component.literal("Added " + name + " to identity whitelist"), true);
                                                 }
                                                 return 1;
                                             })))
-                            .then(CommandManager.literal("remove")
-                                    .then(CommandManager.argument("player", StringArgumentType.string())
+                            .then(Commands.literal("remove")
+                                    .then(Commands.argument("player", StringArgumentType.string())
                                             .executes(ctx -> {
                                                 String name = StringArgumentType.getString(ctx, "player");
                                                 IdentityConfig.getInstance().allowedSwappers().removeIf(n -> n.equalsIgnoreCase(name));
                                                 if (IdentityConfig.getInstance().logCommands()) {
-                                                    ctx.getSource().sendFeedback(() -> Text.literal("Removed " + name + " from identity whitelist"), true);
+                                                    ctx.getSource().sendSuccess(() -> Component.literal("Removed " + name + " from identity whitelist"), true);
                                                 }
                                                 return 1;
                                             })))
                             .build();
 
-            LiteralArgumentBuilder<ServerCommandSource> configBuilder = CommandManager.literal("config")
-                    .then(CommandManager.literal("boolean")
-                            .then(CommandManager.argument("option", StringArgumentType.word()).suggests(BOOLEAN_OPTION_SUGGESTIONS)
-                                    .then(CommandManager.argument("value", BoolArgumentType.bool())
+            LiteralArgumentBuilder<CommandSourceStack> configBuilder = Commands.literal("config")
+                    .then(Commands.literal("boolean")
+                            .then(Commands.argument("option", StringArgumentType.word()).suggests(BOOLEAN_OPTION_SUGGESTIONS)
+                                    .then(Commands.argument("value", BoolArgumentType.bool())
                                             .executes(ctx -> setBooleanOption(ctx.getSource(), StringArgumentType.getString(ctx, "option"), BoolArgumentType.getBool(ctx, "value"))))))
-                    .then(CommandManager.literal("integer")
-                            .then(CommandManager.argument("option", StringArgumentType.word()).suggests(INT_OPTION_SUGGESTIONS)
-                                    .then(CommandManager.argument("value", IntegerArgumentType.integer(0))
+                    .then(Commands.literal("integer")
+                            .then(Commands.argument("option", StringArgumentType.word()).suggests(INT_OPTION_SUGGESTIONS)
+                                    .then(Commands.argument("value", IntegerArgumentType.integer(0))
                                             .executes(ctx -> setIntegerOption(ctx.getSource(), StringArgumentType.getString(ctx, "option"), IntegerArgumentType.getInteger(ctx, "value"))))))
-                    .then(CommandManager.literal("float")
-                            .then(CommandManager.argument("option", StringArgumentType.word()).suggests(FLOAT_OPTION_SUGGESTIONS)
-                                    .then(CommandManager.argument("value", FloatArgumentType.floatArg())
+                    .then(Commands.literal("float")
+                            .then(Commands.argument("option", StringArgumentType.word()).suggests(FLOAT_OPTION_SUGGESTIONS)
+                                    .then(Commands.argument("value", FloatArgumentType.floatArg())
                                             .executes(ctx -> setFloatOption(ctx.getSource(), StringArgumentType.getString(ctx, "option"), FloatArgumentType.getFloat(ctx, "value"))))))
-                    .then(CommandManager.literal("string")
-                            .then(CommandManager.argument("option", StringArgumentType.word()).suggests(STRING_OPTION_SUGGESTIONS)
-                                    .then(CommandManager.argument("value", StringArgumentType.greedyString()).suggests(FORCED_IDENTITY_SUGGESTIONS)
+                    .then(Commands.literal("string")
+                            .then(Commands.argument("option", StringArgumentType.word()).suggests(STRING_OPTION_SUGGESTIONS)
+                                    .then(Commands.argument("value", StringArgumentType.greedyString()).suggests(FORCED_IDENTITY_SUGGESTIONS)
                                             .executes(ctx -> setStringOption(ctx.getSource(), StringArgumentType.getString(ctx, "option"), StringArgumentType.getString(ctx, "value"))))))
                     .then(createListCommand(registryAccess))
                     .then(createMapCommand(registryAccess))
-                    .then(CommandManager.literal("reload")
+                    .then(Commands.literal("reload")
                             .executes(ctx -> reloadConfig(ctx.getSource())));
 
             rootNode.addChild(grantNode);
@@ -649,52 +640,52 @@ public class IdentityCommand {
         });
     }
 
-    private static int test(ServerPlayerEntity source, ServerPlayerEntity player, Identifier identity) {
-        EntityType<?> type = Registries.ENTITY_TYPE.get(identity);
+    private static int test(ServerPlayer source, ServerPlayer player, Identifier identity) {
+        EntityType<?> type = BuiltInRegistries.ENTITY_TYPE.getValue(identity);
 
         if(PlayerIdentity.getIdentity(player) != null && PlayerIdentity.getIdentity(player).getType().equals(type)) {
             if(IdentityConfig.getInstance().logCommands()) {
-                source.sendMessage(Text.translatable("identity.test_positive", player.getDisplayName(), Text.translatable(type.getTranslationKey())), true);
+                source.sendSystemMessage(Component.translatable("identity.test_positive", player.getDisplayName(), Component.translatable(type.getDescriptionId())), true);
             }
 
             return 1;
         }
 
         if(IdentityConfig.getInstance().logCommands()) {
-            source.sendMessage(Text.translatable("identity.test_failed", player.getDisplayName(), Text.translatable(type.getTranslationKey())), true);
+            source.sendSystemMessage(Component.translatable("identity.test_failed", player.getDisplayName(), Component.translatable(type.getDescriptionId())), true);
         }
 
         return 0;
     }
 
-    private static int testNot(ServerPlayerEntity source, ServerPlayerEntity player, Identifier identity) {
-        EntityType<?> type = Registries.ENTITY_TYPE.get(identity);
+    private static int testNot(ServerPlayer source, ServerPlayer player, Identifier identity) {
+        EntityType<?> type = BuiltInRegistries.ENTITY_TYPE.getValue(identity);
 
         if(PlayerIdentity.getIdentity(player) != null && !PlayerIdentity.getIdentity(player).getType().equals(type)) {
             if(IdentityConfig.getInstance().logCommands()) {
-                source.sendMessage(Text.translatable("identity.test_failed", player.getDisplayName(), Text.translatable(type.getTranslationKey())), true);
+                source.sendSystemMessage(Component.translatable("identity.test_failed", player.getDisplayName(), Component.translatable(type.getDescriptionId())), true);
             }
 
             return 1;
         }
 
         if(IdentityConfig.getInstance().logCommands()) {
-            source.sendMessage(Text.translatable("identity.test_positive", player.getDisplayName(), Text.translatable(type.getTranslationKey())), true);
+            source.sendSystemMessage(Component.translatable("identity.test_positive", player.getDisplayName(), Component.translatable(type.getDescriptionId())), true);
         }
 
         return 0;
     }
 
-    private static void grant(ServerPlayerEntity source, ServerPlayerEntity player, Identifier id, @Nullable NbtCompound nbt) {
-        IdentityType<LivingEntity> type = new IdentityType(Registries.ENTITY_TYPE.get(id));
-        Text name = Text.translatable(type.getEntityType().getTranslationKey());
+    private static void grant(ServerPlayer source, ServerPlayer player, Identifier id, @Nullable CompoundTag nbt) {
+        IdentityType<LivingEntity> type = new IdentityType(BuiltInRegistries.ENTITY_TYPE.getValue(id));
+        Component name = Component.translatable(type.getEntityType().getDescriptionId());
 
         // If the specified granting NBT is not null, change the IdentityType to reflect potential variants.
         if(nbt != null) {
-            NbtCompound copy = nbt.copy();
+            CompoundTag copy = nbt.copy();
             copy.putString("id", id.toString());
-            ServerWorld serverWorld = source.getServerWorld();
-            Entity loaded = EntityType.loadEntityWithPassengers(copy, serverWorld, it -> it);
+            ServerLevel serverWorld = source.level();
+            Entity loaded = EntityType.loadEntityRecursive(copy, serverWorld, EntitySpawnReason.COMMAND, it -> it);
             if(loaded instanceof LivingEntity living) {
                 type = new IdentityType<>(living);
                 name = type.createTooltipText(living);
@@ -705,26 +696,26 @@ public class IdentityCommand {
             boolean result = PlayerUnlocks.unlock(player, type);
 
             if(result && IdentityConfig.getInstance().logCommands()) {
-                player.sendMessage(Text.translatable("identity.unlock_entity", name), true);
-                source.sendMessage(Text.translatable("identity.grant_success", name, player.getDisplayName()), true);
+                player.sendSystemMessage(Component.translatable("identity.unlock_entity", name), true);
+                source.sendSystemMessage(Component.translatable("identity.grant_success", name, player.getDisplayName()), true);
             }
         } else {
             if(IdentityConfig.getInstance().logCommands()) {
-                source.sendMessage(Text.translatable("identity.already_has", player.getDisplayName(), name), true);
+                source.sendSystemMessage(Component.translatable("identity.already_has", player.getDisplayName(), name), true);
             }
         }
     }
 
-    private static void revoke(ServerPlayerEntity source, ServerPlayerEntity player, Identifier id, @Nullable NbtCompound nbt) {
-        IdentityType<LivingEntity> type = new IdentityType(Registries.ENTITY_TYPE.get(id));
-        Text name = Text.translatable(type.getEntityType().getTranslationKey());
+    private static void revoke(ServerPlayer source, ServerPlayer player, Identifier id, @Nullable CompoundTag nbt) {
+        IdentityType<LivingEntity> type = new IdentityType(BuiltInRegistries.ENTITY_TYPE.getValue(id));
+        Component name = Component.translatable(type.getEntityType().getDescriptionId());
 
         // If the specified granting NBT is not null, change the IdentityType to reflect potential variants.
         if(nbt != null) {
-            NbtCompound copy = nbt.copy();
+            CompoundTag copy = nbt.copy();
             copy.putString("id", id.toString());
-            ServerWorld serverWorld = source.getServerWorld();
-            Entity loaded = EntityType.loadEntityWithPassengers(copy, serverWorld, it -> it);
+            ServerLevel serverWorld = source.level();
+            Entity loaded = EntityType.loadEntityRecursive(copy, serverWorld, EntitySpawnReason.COMMAND, it -> it);
             if(loaded instanceof LivingEntity living) {
                 type = new IdentityType<>(living);
                 name = type.createTooltipText(living);
@@ -735,27 +726,27 @@ public class IdentityCommand {
             PlayerUnlocks.revoke(player, type);
 
             if(IdentityConfig.getInstance().logCommands()) {
-                player.sendMessage(Text.translatable("identity.revoke_entity", name), true);
-                source.sendMessage(Text.translatable("identity.revoke_success", name, player.getDisplayName()), true);
+                player.sendSystemMessage(Component.translatable("identity.revoke_entity", name), true);
+                source.sendSystemMessage(Component.translatable("identity.revoke_success", name, player.getDisplayName()), true);
             }
         } else {
             if(IdentityConfig.getInstance().logCommands()) {
-                source.sendMessage(Text.translatable("identity.does_not_have", player.getDisplayName(), name), true);
+                source.sendSystemMessage(Component.translatable("identity.does_not_have", player.getDisplayName(), name), true);
             }
         }
     }
 
-    private static void equip(ServerPlayerEntity source, ServerPlayerEntity player, Identifier identity, @Nullable NbtCompound nbt) {
+    private static void equip(ServerPlayer source, ServerPlayer player, Identifier identity, @Nullable CompoundTag nbt) {
         Entity created;
 
         if(nbt != null) {
-            NbtCompound copy = nbt.copy();
+            CompoundTag copy = nbt.copy();
             copy.putString("id", identity.toString());
-            ServerWorld serverWorld = source.getServerWorld();
-            created = EntityType.loadEntityWithPassengers(copy, serverWorld, it -> it);
+            ServerLevel serverWorld = source.level();
+            created = EntityType.loadEntityRecursive(copy, serverWorld, EntitySpawnReason.COMMAND, it -> it);
         } else {
-            EntityType<?> entity = Registries.ENTITY_TYPE.get(identity);
-            created = entity.create(player.getWorld());
+            EntityType<?> entity = BuiltInRegistries.ENTITY_TYPE.getValue(identity);
+            created = entity.create(player.level(), EntitySpawnReason.COMMAND);
         }
 
         if(created instanceof LivingEntity living) {
@@ -764,17 +755,17 @@ public class IdentityCommand {
             if(defaultType != null) {
                 boolean result = PlayerIdentity.updateIdentity(player, defaultType, (LivingEntity) created);
                 if(result && IdentityConfig.getInstance().logCommands()) {
-                    source.sendMessage(Text.translatable("identity.equip_success", Text.translatable(created.getType().getTranslationKey()), player.getDisplayName()), true);
+                    source.sendSystemMessage(Component.translatable("identity.equip_success", Component.translatable(created.getType().getDescriptionId()), player.getDisplayName()), true);
                 }
             }
         }
     }
 
-    private static void unequip(ServerPlayerEntity source, ServerPlayerEntity player) {
+    private static void unequip(ServerPlayer source, ServerPlayer player) {
         boolean result = PlayerIdentity.updateIdentity(player, null, null);
 
         if(result && IdentityConfig.getInstance().logCommands()) {
-            source.sendMessage(Text.translatable("identity.unequip_success", player.getDisplayName()), false);
+            source.sendSystemMessage(Component.translatable("identity.unequip_success", player.getDisplayName()));
         }
     }
 }
