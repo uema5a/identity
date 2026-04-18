@@ -15,7 +15,7 @@ public class GhastAbility extends IdentityAbility<Ghast> {
 
     @Override
     public void onUse(Player player, Ghast identity, Level level) {
-        if (level.isClientSide) {
+        if (level.isClientSide()) {
             return;
         }
 
@@ -32,7 +32,7 @@ public class GhastAbility extends IdentityAbility<Ghast> {
         );
 
         // Move the fireball to appear at mouth level
-        fireball.moveTo(spawnPos.x, spawnPos.y, spawnPos.z, player.getYRot(), player.getXRot());
+        fireball.setPos(spawnPos.x, spawnPos.y, spawnPos.z);
         fireball.setOwner(player);
 
         level.addFreshEntity(fireball);

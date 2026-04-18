@@ -15,7 +15,7 @@ public class GuardianAbility extends IdentityAbility<Guardian> {
 
     @Override
     public void onUse(Player player, Guardian identity, Level level) {
-        if (!level.isClientSide) {
+        if (!level.isClientSide()) {
             List<Player> targets = level.getEntitiesOfClass(
                     Player.class,
                     player.getBoundingBox().inflate(50.0D)

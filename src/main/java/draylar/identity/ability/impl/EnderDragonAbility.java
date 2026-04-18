@@ -15,7 +15,7 @@ public class EnderDragonAbility extends IdentityAbility<EnderDragon> {
 
     @Override
     public void onUse(Player player, EnderDragon identity, Level level) {
-        if (!level.isClientSide) {
+        if (!level.isClientSide()) {
             Vec3 look = player.getLookAngle();
             Vec3 velocity = look.scale(0.5); // control speed
             Vec3 spawnPos = player.getEyePosition().add(look.scale(2.0)); // mouth-level offset
@@ -23,7 +23,7 @@ public class EnderDragonAbility extends IdentityAbility<EnderDragon> {
             DragonFireball dragonFireball = new DragonFireball(level, player, velocity);
 
             // Manually move fireball to spawn in front of the player's head
-            dragonFireball.moveTo(spawnPos.x, spawnPos.y, spawnPos.z, player.getYRot(), player.getXRot());
+            dragonFireball.setPos(spawnPos.x, spawnPos.y, spawnPos.z);
             dragonFireball.setOwner(player);
 
             level.addFreshEntity(dragonFireball);

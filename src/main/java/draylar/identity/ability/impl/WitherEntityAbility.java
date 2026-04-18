@@ -5,7 +5,7 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.boss.wither.WitherBoss;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.entity.projectile.WitherSkull;
+import net.minecraft.world.entity.projectile.hurtingprojectile.WitherSkull;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
@@ -15,7 +15,7 @@ public class WitherEntityAbility extends IdentityAbility<WitherBoss> {
 
     @Override
     public void onUse(Player player, WitherBoss identity, Level level) {
-        if (level.isClientSide) {
+        if (level.isClientSide()) {
             return;
         }
 
@@ -28,7 +28,7 @@ public class WitherEntityAbility extends IdentityAbility<WitherBoss> {
                 SoundEvents.WITHER_SHOOT,
                 SoundSource.HOSTILE,
                 1.0F,
-                0.8F + level.random.nextFloat() * 0.4F
+                0.8F + level.getRandom().nextFloat() * 0.4F
         );
 
         // Direction of fire
@@ -39,7 +39,7 @@ public class WitherEntityAbility extends IdentityAbility<WitherBoss> {
 
         // Create skull entity
         WitherSkull skull = new WitherSkull(level, player, look);
-        skull.moveTo(spawnPos.x, spawnPos.y, spawnPos.z, player.getYRot(), player.getXRot());
+        skull.setPos(spawnPos.x, spawnPos.y, spawnPos.z);
 
         // Adjust velocity and accuracy
         skull.shoot(look.x, look.y, look.z, 1.5F, 0.0F);

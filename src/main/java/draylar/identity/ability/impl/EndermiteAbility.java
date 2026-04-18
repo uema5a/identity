@@ -14,7 +14,7 @@ public class EndermiteAbility extends IdentityAbility<Endermite> {
 
     @Override
     public void onUse(Player player, Endermite identity, Level level) {
-        if (level.isClientSide) {
+        if (level.isClientSide()) {
             return;
         }
 

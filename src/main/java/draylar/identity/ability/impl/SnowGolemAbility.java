@@ -5,7 +5,9 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.animal.golem.SnowGolem;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.entity.projectile.Snowball;
+import net.minecraft.world.entity.projectile.throwableitemprojectile.Snowball;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
@@ -24,22 +26,22 @@ public class SnowGolemAbility extends IdentityAbility<SnowGolem> {
                 SoundEvents.SNOWBALL_THROW,
                 SoundSource.NEUTRAL,
                 0.5F,
-                0.4F / (level.random.nextFloat() * 0.4F + 0.8F)
+                0.4F / (level.getRandom().nextFloat() * 0.4F + 0.8F)
         );
 
-        if (!level.isClientSide) {
+        if (!level.isClientSide()) {
             Vec3 look = player.getLookAngle();
             Vec3 spawnPos = player.getEyePosition().add(look.scale(0.8)); // Slightly forward from eyes
 
             for (int i = 0; i < 10; i++) {
-                Snowball snowball = new Snowball(level, player);
+                Snowball snowball = new Snowball(level, player, new ItemStack(Items.SNOWBALL));
 
                 // Randomize direction slightly for spread
-                float pitchOffset = (float) (player.getXRot() + level.random.nextGaussian() * 5.0);
-                float yawOffset = (float) (player.getYRot() + level.random.nextGaussian() * 5.0);
+                float pitchOffset = (float) (player.getXRot() + level.getRandom().nextGaussian() * 5.0);
+                float yawOffset = (float) (player.getYRot() + level.getRandom().nextGaussian() * 5.0);
 
                 snowball.shootFromRotation(player, pitchOffset, yawOffset, 0.0F, 1.5F, 1.0F);
-                snowball.moveTo(spawnPos.x, spawnPos.y, spawnPos.z, yawOffset, pitchOffset);
+                snowball.setPos(spawnPos.x, spawnPos.y, spawnPos.z);
 
                 level.addFreshEntity(snowball);
             }

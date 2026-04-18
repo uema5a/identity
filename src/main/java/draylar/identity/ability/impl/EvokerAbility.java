@@ -3,7 +3,7 @@ package draylar.identity.ability.impl;
 import draylar.identity.ability.IdentityAbility;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.world.entity.monster.EvokerFangs;
+import net.minecraft.world.entity.projectile.EvokerFangs;
 import net.minecraft.world.entity.monster.illager.Evoker;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
@@ -41,7 +41,7 @@ public class EvokerAbility extends IdentityAbility<Evoker> {
             BlockPos underneath2Position = new BlockPos((int) origin.x, (int) origin.y, (int) origin.z).below(2);
             BlockState underneath2 = level.getBlockState(underneath2Position);
             if (underneath2.isFaceSturdy(level, underneath2Position, Direction.UP) && level.isEmptyBlock(underneath2Position.above())) {
-                fangs.moveTo(fangs.getX(), fangs.getY() - 1, fangs.getZ());
+                fangs.setPos(fangs.getX(), fangs.getY() - 1, fangs.getZ());
                 level.addFreshEntity(fangs);
                 origin = origin.add(0, -1, 0);
                 continue;
@@ -51,7 +51,7 @@ public class EvokerAbility extends IdentityAbility<Evoker> {
             BlockPos upPosition = new BlockPos((int) origin.x, (int) origin.y, (int) origin.z).above();
             BlockState up = level.getBlockState(underneath2Position);
             if (up.isFaceSturdy(level, upPosition, Direction.UP) && level.isEmptyBlock(upPosition)) {
-                fangs.moveTo(fangs.getX(), fangs.getY() + 1, fangs.getZ());
+                fangs.setPos(fangs.getX(), fangs.getY() + 1, fangs.getZ());
                 level.addFreshEntity(fangs);
                 origin = origin.add(0, 1, 0);
                 continue;

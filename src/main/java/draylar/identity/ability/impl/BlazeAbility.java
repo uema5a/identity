@@ -15,7 +15,7 @@ public class BlazeAbility extends IdentityAbility<Blaze> {
 
     @Override
     public void onUse(Player player, Blaze identity, Level level) {
-        if (!level.isClientSide) {
+        if (!level.isClientSide()) {
             Vec3 look = player.getLookAngle();
             Vec3 spawnPos = player.getEyePosition().add(look.scale(0.6)); // near head, slightly forward
             Vec3 velocity = look.scale(0.5); // optional: slower for vanilla-like feel
@@ -25,9 +25,7 @@ public class BlazeAbility extends IdentityAbility<Blaze> {
                     spawnPos.x,
                     spawnPos.y,
                     spawnPos.z,
-                    velocity.x,
-                    velocity.y,
-                    velocity.z
+                    velocity
             );
 
             smallFireball.setOwner(player);
@@ -39,7 +37,7 @@ public class BlazeAbility extends IdentityAbility<Blaze> {
                     SoundEvents.BLAZE_SHOOT,
                     SoundSource.HOSTILE,
                     2.0F,
-                    (level.random.nextFloat() - level.random.nextFloat()) * 0.2F + 1.0F
+                    (level.getRandom().nextFloat() - level.getRandom().nextFloat()) * 0.2F + 1.0F
             );
         }
     }

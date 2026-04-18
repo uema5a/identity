@@ -15,7 +15,7 @@ public class LlamaAbility<T extends Llama> extends IdentityAbility<T> {
 
     @Override
     public void onUse(Player player, Llama identity, Level level) {
-        if (level.isClientSide) {
+        if (level.isClientSide()) {
             return;
         }
 
@@ -27,7 +27,7 @@ public class LlamaAbility<T extends Llama> extends IdentityAbility<T> {
 
         // Spawn position: a bit in front of the face to prevent self-hit
         Vec3 spawnPos = player.getEyePosition().add(look);
-        spit.moveTo(spawnPos.x, spawnPos.y, spawnPos.z, player.getYRot(), player.getXRot());
+        spit.setPos(spawnPos.x, spawnPos.y, spawnPos.z);
 
         // Set trajectory and speed
         spit.shoot(look.x, look.y, look.z, 1.5F, 10.0F);
@@ -41,7 +41,7 @@ public class LlamaAbility<T extends Llama> extends IdentityAbility<T> {
                 SoundEvents.LLAMA_SPIT,
                 player.getSoundSource(),
                 1.0F,
-                1.0F + (level.random.nextFloat() - level.random.nextFloat()) * 0.2F
+                1.0F + (level.getRandom().nextFloat() - level.getRandom().nextFloat()) * 0.2F
         );
 
         // Spawn entity

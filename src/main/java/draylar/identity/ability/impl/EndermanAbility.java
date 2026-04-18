@@ -18,7 +18,7 @@ public class EndermanAbility extends IdentityAbility<EnderMan> {
 
     @Override
     public void onUse(Player player, EnderMan identity, Level level) {
-        if (level.isClientSide) {
+        if (level.isClientSide()) {
             return;
         }
 

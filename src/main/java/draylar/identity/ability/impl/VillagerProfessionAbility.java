@@ -10,8 +10,8 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.ai.village.poi.PoiType;
 import net.minecraft.world.entity.ai.village.poi.PoiTypes;
-import net.minecraft.world.entity.npc.Villager;
-import net.minecraft.world.entity.npc.VillagerProfession;
+import net.minecraft.world.entity.npc.villager.Villager;
+import net.minecraft.world.entity.npc.villager.VillagerProfession;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
@@ -30,7 +30,7 @@ public class VillagerProfessionAbility extends IdentityAbility<Villager> {
 
     @Override
     public void onUse(Player player, Villager identity, Level level) {
-        if (level.isClientSide) {
+        if (level.isClientSide()) {
             return;
         }
 
@@ -50,9 +50,8 @@ public class VillagerProfessionAbility extends IdentityAbility<Villager> {
         if (poi.isPresent()) {
             Holder<PoiType> targetPoi = poi.get();
 
-            var poiKey = BuiltInRegistries.POINT_OF_INTEREST_TYPE.getKey(targetPoi.value());
-            Identifier poiId = poiKey != null ? poiKey.location() : null;
-            Identifier worldId = player.level().dimension().location();
+            Identifier poiId = BuiltInRegistries.POINT_OF_INTEREST_TYPE.getKey(targetPoi.value());
+            Identifier worldId = player.level().dimension().identifier();
             // TODO Phase C: PlayerDataProvider.getVillagerIdentities() will be migrated by B3 from NbtCompound to CompoundTag
             Map<String, CompoundTag> villagerMap = ((PlayerDataProvider) player).getVillagerIdentities();
             String existingName = null;
@@ -63,7 +62,7 @@ public class VillagerProfessionAbility extends IdentityAbility<Villager> {
                 CompoundTag saved = entry.getValue();
                 if (matchesWorkstation(saved, worldId, workstationPos)) {
                     existingName = entry.getKey();
-                    existingProfession = saved.getString("ProfessionId");
+                    existingProfession = saved.getStringOr("ProfessionId", "");
                     break;
                 }
             }
@@ -72,8 +71,7 @@ public class VillagerProfessionAbility extends IdentityAbility<Villager> {
                 boolean matches = false;
 
                 // 1) Simple ID match: many mappings name POI types after the profession (e.g., minecraft:librarian)
-                var profKey = BuiltInRegistries.VILLAGER_PROFESSION.getKey(profession);
-                Identifier profIdDirect = profKey != null ? profKey.location() : null;
+                Identifier profIdDirect = BuiltInRegistries.VILLAGER_PROFESSION.getKey(profession);
                 if (poiId != null && poiId.equals(profIdDirect)) {
                     matches = true;
                 }
@@ -134,8 +132,8 @@ public class VillagerProfessionAbility extends IdentityAbility<Villager> {
         if (tag == null) {
             return false;
         }
-        String dim = tag.getString("WorkstationDim");
-        long storedPos = tag.contains("WorkstationPos") ? tag.getLong("WorkstationPos") : Long.MIN_VALUE;
+        String dim = tag.getStringOr("WorkstationDim", "");
+        long storedPos = tag.contains("WorkstationPos") ? tag.getLongOr("WorkstationPos", Long.MIN_VALUE) : Long.MIN_VALUE;
         return !dim.isEmpty() && storedPos != Long.MIN_VALUE && worldId.toString().equals(dim) && storedPos == workstationPos;
     }
 }

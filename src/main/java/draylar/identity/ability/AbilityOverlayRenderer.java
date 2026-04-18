@@ -1,12 +1,12 @@
 package draylar.identity.ability;
 
-import com.mojang.blaze3d.systems.RenderSystem;
 import draylar.identity.api.PlayerAbilities;
 import draylar.identity.api.PlayerIdentity;
+import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElement;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.resources.Identifier;
@@ -22,14 +22,15 @@ public class AbilityOverlayRenderer {
     private static int fadingProgress = 0;
 
     public static void register() {
-        // Fabric API 0.145+26.1: HudElementRegistry replaces the removed HudRenderCallback
-        HudElementRegistry.register(
+        // Fabric API 0.145+26.1: HudElementRegistry uses addLast (not register)
+        HudElementRegistry.addLast(
                 Identifier.parse("identity:ability_overlay"),
                 AbilityOverlayRenderer::render
         );
     }
 
-    private static void render(GuiGraphics guiGraphics, DeltaTracker deltaTracker) {
+    @SuppressWarnings("unchecked")
+    private static void render(GuiGraphicsExtractor guiGraphics, DeltaTracker deltaTracker) {
         Minecraft client = Minecraft.getInstance();
         LocalPlayer player = client.player;
 
@@ -44,7 +45,8 @@ public class AbilityOverlayRenderer {
         }
 
         //TODO make this tick less often
-        IdentityAbility<? extends LivingEntity> identityAbility = AbilityRegistry.get(identity.getType());
+        @SuppressWarnings("rawtypes")
+        IdentityAbility identityAbility = AbilityRegistry.get(identity.getType());
 
         if (identityAbility == null) {
             return;
@@ -55,6 +57,7 @@ public class AbilityOverlayRenderer {
         }
 
         int cd = PlayerAbilities.getCooldown(player);
+        // Use unchecked cast to pass LivingEntity to the specific-typed getCooldown
         int max = identityAbility.getCooldown(identity);
         float cooldownScale = 1 - cd / (float) max;
 
@@ -86,9 +89,9 @@ public class AbilityOverlayRenderer {
         int height = client.getWindow().getGuiScaledHeight();
         double d = client.getWindow().getGuiScale();
 
-        guiGraphics.pose().pushPose();
+        guiGraphics.pose().pushMatrix();
         if (cooldownScale != 1) {
-            RenderSystem.enableScissor(
+            guiGraphics.enableScissor(
                     (int) ((double) 0 * d),
                     (int) ((double) 0 * d),
                     (int) ((double) width * d),
@@ -100,15 +103,15 @@ public class AbilityOverlayRenderer {
             float fadeScalar = fadingProgress / 50f; // 0f -> 1f, 0 is start, 1 is end
             float scale = 1f + (float) Math.sin(fadeScalar * 1.5 * Math.PI) - .25f;
             scale = Math.max(scale, 0);
-            guiGraphics.pose().scale(scale, scale, scale);
+            guiGraphics.pose().scale(scale, scale);
         }
 
         // TODO: cache ability stack?
         ItemStack stack = new ItemStack(identityAbility.getIcon());
-        guiGraphics.renderItem(stack, (int) (width * .95f), (int) (height * .92f));
+        guiGraphics.item(stack, (int) (width * .95f), (int) (height * .92f));
 
-        RenderSystem.disableScissor();
-        guiGraphics.pose().popPose();
+        guiGraphics.disableScissor();
+        guiGraphics.pose().popMatrix();
 
         lastCooldown = cd;
     }
