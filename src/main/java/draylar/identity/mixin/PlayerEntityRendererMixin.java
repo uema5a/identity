@@ -104,7 +104,7 @@ public abstract class PlayerEntityRendererMixin extends LivingEntityRenderer {
         identity.setOnGround(player.onGround());
         identity.setDeltaMovement(player.getDeltaMovement());
         ((EntityAccessor) identity).setVehicle(player.getVehicle());
-        ((EntityAccessor) identity).setTouchingWater(player.isInWater());
+        ((EntityAccessor) identity).setWasTouchingWater(player.isInWater());
 
         // Phantoms are rendered upside-down, so pitch must be inverted
         if (identity instanceof Phantom) {
@@ -136,7 +136,7 @@ public abstract class PlayerEntityRendererMixin extends LivingEntityRenderer {
         // startUsingItem before tickActiveItemStack so item-use timer advances correctly
         InteractionHand hand = player.getUsedItemHand() == null ? InteractionHand.MAIN_HAND : player.getUsedItemHand();
         identity.startUsingItem(hand);
-        ((LivingEntityAccessor) identity).callSetLivingFlag(1, player.isUsingItem());
+        ((LivingEntityAccessor) identity).callSetLivingEntityFlag(1, player.isUsingItem());
         identity.getTicksUsingItem();
         ((LivingEntityAccessor) identity).callTickActiveItemStack();
     }

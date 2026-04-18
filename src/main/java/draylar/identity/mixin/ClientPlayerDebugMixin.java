@@ -1,19 +1,15 @@
 package draylar.identity.mixin;
 
-import net.Gabou.gaboulibs.util.PlayerDebugUtils;
-import net.minecraft.client.network.ClientPlayerEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.util.math.Box;
+import net.minecraft.client.player.LocalPlayer;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-@Mixin(ClientPlayerEntity.class)
+// TODO: re-implement gaboulibs PlayerDebugUtils functionality locally
+@Mixin(LocalPlayer.class)
 public class ClientPlayerDebugMixin {
 
 //    @Inject(method = "tick", at = @At("TAIL"))
 //    private void onClientTick(CallbackInfo ci) {
-//        PlayerDebugUtils.logPlayerDebug((PlayerEntity)(Object)this, "client");
+//        // TODO: re-implement gaboulibs PlayerDebugUtils functionality locally
+//        // PlayerDebugUtils.logPlayerDebug((Player)(Object)this, "client");
 //    }
 }

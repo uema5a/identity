@@ -15,7 +15,7 @@ import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.monster.Ravager;
-import net.minecraft.world.entity.passive.Villager;
+import net.minecraft.world.entity.npc.villager.Villager;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -96,9 +96,9 @@ public abstract class PlayerEntityDataMixin extends LivingEntity implements Play
 
         // Align step height on load to avoid temporary desync
         if (identity != null) {
-            ((Player) (Object) this).setStepHeight(identity.maxUpStep());
+            // TODO Phase D: setStepHeight removed in MC 26.1; step height is now automatic via maxUpStep()
         } else {
-            ((Player) (Object) this).setStepHeight(0.6F);
+            // TODO Phase D: setStepHeight removed in MC 26.1; step height is now automatic via maxUpStep()
         }
 
         // Villager Identities (xGabou extension) — stored as SNBT strings per key
@@ -327,7 +327,7 @@ public abstract class PlayerEntityDataMixin extends LivingEntity implements Play
 
     @Unique
     @Override
-    public boolean updateIdentity(@Nullable LivingEntity identity) {
+    public boolean updateIdentity(@Nullable IdentityType<?> type, @Nullable LivingEntity identity) {
         Player player = (Player) (Object) this;
         InteractionResult result = IdentitySwapCallback.EVENT.invoker().swap((ServerPlayer) player, identity);
         if (result == InteractionResult.FAIL) {
@@ -344,9 +344,9 @@ public abstract class PlayerEntityDataMixin extends LivingEntity implements Play
 
         // Align server step height with identity (prevents movement desync)
         if (identity != null) {
-            player.setStepHeight(identity.maxUpStep());
+            // TODO Phase D: setStepHeight removed in MC 26.1; step height is now automatic via maxUpStep()
         } else {
-            player.setStepHeight(0.6F);
+            // TODO Phase D: setStepHeight removed in MC 26.1; step height is now automatic via maxUpStep()
         }
 
         // Identity is valid and scaling health is on; set entity's max health and current health to reflect identity.
