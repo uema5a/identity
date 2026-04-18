@@ -11,7 +11,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.npc.Villager;
+import net.minecraft.world.entity.npc.villager.Villager;
 
 import java.util.Map;
 
@@ -32,9 +32,9 @@ public class VillagerCommand {
                                         }
                                         player.sendSystemMessage(Component.literal("Saved villager professions:"));
                                         map.forEach((name, tag) -> {
-                                            String prof = tag.getString("ProfessionId");
-                                            String dim = tag.getString("WorkstationDim");
-                                            long posLong = tag.contains("WorkstationPos") ? tag.getLong("WorkstationPos") : Long.MIN_VALUE;
+                                            String prof = tag.getStringOr("ProfessionId", "");
+                                            String dim = tag.getStringOr("WorkstationDim", "");
+                                            long posLong = tag.contains("WorkstationPos") ? tag.getLongOr("WorkstationPos", Long.MIN_VALUE) : Long.MIN_VALUE;
                                             BlockPos blockPos = posLong == Long.MIN_VALUE ? null : BlockPos.of(posLong);
                                             String location = blockPos == null ? "?" : (blockPos.getX() + ", " + blockPos.getY() + ", " + blockPos.getZ());
                                             player.sendSystemMessage(Component.literal("- " + name + " -> " + prof + " @ " + dim + " " + location));
@@ -52,16 +52,16 @@ public class VillagerCommand {
                                                     return 0;
                                                 }
                                                 CompoundTag tag = map.get(name);
-                                                String prof = tag.getString("ProfessionId");
-                                                String dim = tag.getString("WorkstationDim");
-                                                long posLong = tag.contains("WorkstationPos") ? tag.getLong("WorkstationPos") : Long.MIN_VALUE;
+                                                String prof = tag.getStringOr("ProfessionId", "");
+                                                String dim = tag.getStringOr("WorkstationDim", "");
+                                                long posLong = tag.contains("WorkstationPos") ? tag.getLongOr("WorkstationPos", Long.MIN_VALUE) : Long.MIN_VALUE;
                                                 BlockPos blockPos = posLong == Long.MIN_VALUE ? null : BlockPos.of(posLong);
                                                 String location = blockPos == null ? "?" : (blockPos.getX() + ", " + blockPos.getY() + ", " + blockPos.getZ());
                                                 player.sendSystemMessage(Component.literal("Villager '" + name + "' profession: " + prof + " @ " + dim + " " + location));
                                                 return 1;
                                             })))
                             .then(Commands.literal("trade")
-                                    .requires(src -> src.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                                    .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
                                     .then(Commands.literal("myself")
                                             .executes(ctx -> {
                                                 ServerPlayer player = ctx.getSource().getPlayer();

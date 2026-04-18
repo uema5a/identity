@@ -7,20 +7,21 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.ConfirmScreen;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
-import net.minecraft.util.Identifier;
+import net.minecraft.resources.Identifier;
 
 public class VillagerProfessionScreen extends Screen {
 
     private final Identifier professionId;
-    private final net.minecraft.util.math.BlockPos pos;
+    private final BlockPos pos;
     private final Identifier worldId;
     private final String originalName;
     private final String existingProfessionId;
     private EditBox nameField;
     private Button deleteButton;
 
-    public VillagerProfessionScreen(Identifier professionId, net.minecraft.util.math.BlockPos pos, Identifier worldId, String originalName, String existingProfessionId) {
+    public VillagerProfessionScreen(Identifier professionId, BlockPos pos, Identifier worldId, String originalName, String existingProfessionId) {
         super(Component.translatable("identity.profession.title"));
         this.professionId = professionId;
         this.pos = pos;
@@ -60,16 +61,16 @@ public class VillagerProfessionScreen extends Screen {
         extractBackground(extractor, mouseX, mouseY, delta);
         super.extractRenderState(extractor, mouseX, mouseY, delta);
         int titleY = height / 2 - 50;
-        extractor.centeredText(font, title, width / 2, titleY, 0xFFFFFF, true);
+        extractor.centeredText(font, title, width / 2, titleY, 0xFFFFFF);
         int infoY = titleY + 15;
         if (originalName != null) {
-            extractor.centeredText(font, Component.translatable("identity.profession.current_name", originalName), width / 2, infoY, 0xAAAAAA, true);
+            extractor.centeredText(font, Component.translatable("identity.profession.current_name", originalName), width / 2, infoY, 0xAAAAAA);
             infoY += 12;
             if (existingProfessionId != null && !existingProfessionId.isEmpty()) {
-                extractor.centeredText(font, Component.translatable("identity.profession.current_profession", resolveProfessionName(existingProfessionId)), width / 2, infoY, 0xAAAAAA, true);
+                extractor.centeredText(font, Component.translatable("identity.profession.current_profession", resolveProfessionName(existingProfessionId)), width / 2, infoY, 0xAAAAAA);
             }
         } else {
-            extractor.centeredText(font, Component.translatable("identity.profession.prompt"), width / 2, infoY, 0xAAAAAA, true);
+            extractor.centeredText(font, Component.translatable("identity.profession.prompt"), width / 2, infoY, 0xAAAAAA);
         }
         nameField.extractRenderState(extractor, mouseX, mouseY, delta);
     }

@@ -17,6 +17,9 @@ import net.minecraft.world.entity.LivingEntity;
 
 public class EntityWidget<T extends LivingEntity> extends AbstractWidget {
 
+    /** Vertical offset (in pixels) applied to entity rendering in the identity grid. Adjustable via /identity debug offset. */
+    public static int VERTICAL_OFFSET = 0;
+
     private final IdentityType<T> type;
     private final T entity;
     private final int size;

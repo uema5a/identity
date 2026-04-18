@@ -33,24 +33,24 @@ public final class ProfessionLifecycle {
                 continue;
             }
 
-            String prof = tag.getString("ProfessionId");
-            if (prof == null || prof.isEmpty()) continue; // unemployed
+            String prof = tag.getStringOr("ProfessionId", "");
+            if (prof.isEmpty()) continue; // unemployed
 
-            String dim = tag.getString("WorkstationDim");
-            long posLong = tag.contains("WorkstationPos") ? tag.getLong("WorkstationPos") : Long.MIN_VALUE;
+            String dim = tag.getStringOr("WorkstationDim", "");
+            long posLong = tag.contains("WorkstationPos") ? tag.getLongOr("WorkstationPos", Long.MIN_VALUE) : Long.MIN_VALUE;
             if (dim == null || dim.isEmpty() || posLong == Long.MIN_VALUE) {
                 removeAndNotify(player, it, e.getKey(), prof);
                 continue;
             }
 
-            ServerLevel world = player.getServer().getLevel(ResourceKey.create(Registries.DIMENSION, Identifier.parse(dim)));
+            ServerLevel world = ((ServerLevel) player.level()).getServer().getLevel(ResourceKey.create(Registries.DIMENSION, Identifier.parse(dim)));
             if (world == null) {
                 removeAndNotify(player, it, e.getKey(), prof);
                 continue;
             }
 
             BlockPos pos = BlockPos.of(posLong);
-            if (world.isAir(pos)) {
+            if (world.isEmptyBlock(pos)) {
                 removeAndNotify(player, it, e.getKey(), prof);
                 continue;
             }

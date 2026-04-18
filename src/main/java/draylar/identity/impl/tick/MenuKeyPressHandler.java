@@ -5,6 +5,7 @@ import draylar.identity.config.IdentityConfig;
 import draylar.identity.screen.IdentityScreen;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.minecraft.client.Minecraft;
+import net.minecraft.server.permissions.Permissions;
 
 public class MenuKeyPressHandler implements ClientTickEvents.StartTick {
 
@@ -14,9 +15,9 @@ public class MenuKeyPressHandler implements ClientTickEvents.StartTick {
 
         if(IdentityClient.MENU_KEY.consumeClick()) {
             if(IdentityConfig.getInstance().enableClientSwapMenu() ||
-                client.player.hasPermissions(3) ||
+                client.player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER) ||
                 IdentityConfig.getInstance().allowedSwappers().stream()
-                    .anyMatch(p -> p.equalsIgnoreCase(client.player.getGameProfile().getName()))) {
+                    .anyMatch(p -> client.player.getProfile().name().map(p::equalsIgnoreCase).orElse(false))) {
                 Minecraft.getInstance().setScreen(new IdentityScreen());
             }
         }
