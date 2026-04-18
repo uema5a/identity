@@ -1,52 +1,46 @@
 package draylar.identity.ability.impl;
 
 import draylar.identity.ability.IdentityAbility;
-import net.minecraft.entity.mob.GhastEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.entity.projectile.FireballEntity;
-import net.minecraft.entity.projectile.SmallFireballEntity;
-import net.minecraft.item.Item;
-import net.minecraft.item.Items;
-import net.minecraft.sound.SoundCategory;
-import net.minecraft.sound.SoundEvents;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.World;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.entity.monster.Ghast;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.projectile.hurtingprojectile.LargeFireball;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.Vec3;
 
-public class GhastAbility extends IdentityAbility<GhastEntity> {
+public class GhastAbility extends IdentityAbility<Ghast> {
 
     @Override
-    public void onUse(PlayerEntity player, GhastEntity identity, World world) {
-        if (world.isClient) {
+    public void onUse(Player player, Ghast identity, Level level) {
+        if (level.isClientSide) {
             return;
         }
 
-        Vec3d look = player.getRotationVec(1.0F);
+        Vec3 look = player.getLookAngle();
 
         // Position the fireball slightly forward and at head height
-        Vec3d spawnPos = player.getEyePos().add(look.multiply(4.0));
+        Vec3 spawnPos = player.getEyePosition().add(look.scale(4.0));
 
-        // Fireball speed vector
-        Vec3d velocity = look.multiply(1.0);
-
-        FireballEntity fireball = new FireballEntity(
-                world,
+        LargeFireball fireball = new LargeFireball(
+                level,
                 player,
-                velocity.x,velocity.y,velocity.z,
+                look,
                 1 // explosion power (same as ghast)
         );
 
         // Move the fireball to appear at mouth level
-        fireball.refreshPositionAndAngles(spawnPos.x, spawnPos.y, spawnPos.z, player.getYaw(), player.getPitch());
+        fireball.moveTo(spawnPos.x, spawnPos.y, spawnPos.z, player.getYRot(), player.getXRot());
         fireball.setOwner(player);
 
-        world.spawnEntity(fireball);
+        level.addFreshEntity(fireball);
 
         // Ghast sound effects
-        world.playSoundFromEntity(null, player, SoundEvents.ENTITY_GHAST_SHOOT, SoundCategory.HOSTILE, 10.0F, 1.0F);
-        world.playSoundFromEntity(null, player, SoundEvents.ENTITY_GHAST_WARN, SoundCategory.HOSTILE, 10.0F, 1.0F);
+        level.playSound(null, player, SoundEvents.GHAST_SHOOT, SoundSource.HOSTILE, 10.0F, 1.0F);
+        level.playSound(null, player, SoundEvents.GHAST_WARN, SoundSource.HOSTILE, 10.0F, 1.0F);
     }
-
-
 
     @Override
     public Item getIcon() {

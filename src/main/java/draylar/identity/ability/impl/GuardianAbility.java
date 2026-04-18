@@ -1,29 +1,29 @@
 package draylar.identity.ability.impl;
 
 import draylar.identity.ability.IdentityAbility;
-import net.minecraft.entity.effect.StatusEffectInstance;
-import net.minecraft.entity.effect.StatusEffects;
-import net.minecraft.entity.mob.GuardianEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.Item;
-import net.minecraft.item.Items;
-import net.minecraft.world.World;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.entity.monster.Guardian;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.level.Level;
 
 import java.util.List;
 
-public class GuardianAbility extends IdentityAbility<GuardianEntity> {
+public class GuardianAbility extends IdentityAbility<Guardian> {
 
     @Override
-    public void onUse(PlayerEntity player, GuardianEntity identity, World world) {
-        if (!world.isClient) {
-            List<PlayerEntity> targets = world.getNonSpectatingEntities(
-                    PlayerEntity.class,
-                    player.getBoundingBox().expand(50.0D)
+    public void onUse(Player player, Guardian identity, Level level) {
+        if (!level.isClientSide) {
+            List<Player> targets = level.getEntitiesOfClass(
+                    Player.class,
+                    player.getBoundingBox().inflate(50.0D)
             );
 
-            for (PlayerEntity target : targets) {
+            for (Player target : targets) {
                 if (target != player) {
-                    target.addStatusEffect(new StatusEffectInstance(StatusEffects.MINING_FATIGUE, 20 * 60, 2));
+                    target.addEffect(new MobEffectInstance(MobEffects.MINING_FATIGUE, 20 * 60, 2));
                 }
             }
         }
@@ -35,8 +35,7 @@ public class GuardianAbility extends IdentityAbility<GuardianEntity> {
     }
 
     @Override
-    public int getCooldown(GuardianEntity entity) {
+    public int getCooldown(Guardian entity) {
         return 20 * 30;
     }
 }
-

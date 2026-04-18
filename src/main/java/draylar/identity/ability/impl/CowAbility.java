@@ -1,20 +1,20 @@
 package draylar.identity.ability.impl;
 
 import draylar.identity.ability.IdentityAbility;
-import net.minecraft.entity.passive.CowEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.Item;
-import net.minecraft.item.Items;
-import net.minecraft.sound.SoundCategory;
-import net.minecraft.sound.SoundEvents;
-import net.minecraft.world.World;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.entity.animal.cow.Cow;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.level.Level;
 
-public class CowAbility extends IdentityAbility<CowEntity> {
+public class CowAbility extends IdentityAbility<Cow> {
 
     @Override
-    public void onUse(PlayerEntity player, CowEntity identity, World world) {
-        player.clearStatusEffects();
-        world.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.ENTITY_GENERIC_DRINK, SoundCategory.PLAYERS, 1.0F, 1.0F);
+    public void onUse(Player player, Cow identity, Level level) {
+        player.removeAllEffects();
+        level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.GENERIC_DRINK, SoundSource.PLAYERS, 1.0F, 1.0F);
     }
 
     @Override

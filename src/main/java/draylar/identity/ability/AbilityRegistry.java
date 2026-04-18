@@ -1,8 +1,8 @@
 package draylar.identity.ability;
 
 import draylar.identity.ability.impl.*;
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.LivingEntity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -33,7 +33,6 @@ public class AbilityRegistry {
         register(EntityType.VILLAGER, new VillagerProfessionAbility());
         register(EntityType.GUARDIAN, new GuardianAbility());
         register(EntityType.ELDER_GUARDIAN, new GuardianAbility());
-
     }
 
     public static IdentityAbility get(EntityType<?> type) {
