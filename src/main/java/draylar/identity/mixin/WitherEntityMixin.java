@@ -3,6 +3,7 @@ package draylar.identity.mixin;
 import draylar.identity.api.PlayerIdentity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.boss.wither.WitherBoss;
 import net.minecraft.world.entity.monster.Monster;
 import net.minecraft.world.entity.player.Player;
@@ -22,13 +23,13 @@ public abstract class WitherEntityMixin extends Monster {
         super(entityType, level);
     }
 
-    // MC 26.1 LVT for customServerAiStep: 3 ints precede the List<LivingEntity> target list
+    // MC 26.1 customServerAiStep(ServerLevel): 2 ints precede the List<LivingEntity> target list
     @Inject(
-            method = "customServerAiStep",
+            method = "customServerAiStep(Lnet/minecraft/server/level/ServerLevel;)V",
             at = @At(value = "INVOKE", target = "Ljava/util/List;isEmpty()Z"),
             locals = LocalCapture.CAPTURE_FAILHARD
     )
-    private void removeInvalidPlayerTargets(CallbackInfo ci, int j, int someInt, int b, List<LivingEntity> list) {
+    private void removeInvalidPlayerTargets(ServerLevel level, CallbackInfo ci, int j, int b, List<LivingEntity> list) {
         LivingEntity currentTarget = this.getTarget();
         list.removeIf(entity -> {
             if (!(entity instanceof Player player)) return false;
