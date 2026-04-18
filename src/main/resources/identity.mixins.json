@@ -55,7 +55,6 @@
     "LivingEntitySubmitMixin",
     "PlayerEntityRendererMixin",
     "ShadowMixin",
-    "StrayOverlayMixin",
     "accessor.BlazeEntityModelAccessor",
     "accessor.EntityShadowAccessor",
     "accessor.IllagerEntityModelAccessor",
