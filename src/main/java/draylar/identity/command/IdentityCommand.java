@@ -13,7 +13,7 @@ import draylar.identity.api.PlayerUnlocks;
 import draylar.identity.config.IdentityConfig;
 import draylar.identity.api.variant.IdentityType;
 import draylar.identity.screen.widget.EntityWidget;
-import CommandBuildContext;
+import net.minecraft.commands.CommandBuildContext;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.SharedSuggestionProvider;
