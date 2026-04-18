@@ -1,29 +1,29 @@
 package draylar.identity.mixin;
 
+import draylar.identity.Identity;
 import draylar.identity.api.IdentityGranting;
 import draylar.identity.api.PlayerIdentity;
-import draylar.identity.api.SafeTagManager;
 import draylar.identity.api.variant.IdentityType;
 import draylar.identity.impl.NearbySongAccessor;
-import draylar.identity.compat.LivingEntityCompatAccessor;
+import draylar.identity.mixin.accessor.LivingEntityAccessor;
 import draylar.identity.registry.IdentityEntityTags;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.minecraft.block.Blocks;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.entity.*;
-import net.minecraft.entity.damage.DamageSource;
-import net.minecraft.entity.effect.StatusEffect;
-import net.minecraft.entity.effect.StatusEffectInstance;
-import net.minecraft.entity.effect.StatusEffects;
-import net.minecraft.entity.mob.SpiderEntity;
-import net.minecraft.entity.passive.BatEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.fluid.FluidState;
-import net.minecraft.registry.tag.FluidTags;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.World;
+import net.minecraft.world.entity.*;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.effect.MobEffect;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.entity.monster.spider.Spider;
+import net.minecraft.world.entity.animal.fish.WaterAnimal;
+import net.minecraft.world.entity.ambient.Bat;
+import net.minecraft.world.entity.animal.dolphin.Dolphin;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.material.FluidState;
+import net.minecraft.tags.FluidTags;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -34,151 +34,83 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-import static draylar.identity.Identity.identity$isAquatic;
-
 @Mixin(LivingEntity.class)
 public abstract class LivingEntityMixin extends Entity implements NearbySongAccessor {
 
     @Shadow
-    protected abstract int getNextAirOnLand(int air);
+    protected abstract int increaseAirSupply(int air);
 
     @Shadow
-    public abstract boolean hasStatusEffect(StatusEffect effect);
+    public abstract boolean hasEffect(Holder<MobEffect> effect);
 
-    protected LivingEntityMixin(EntityType<?> type, World world) {
-        super(type, world);
+    protected LivingEntityMixin(EntityType<?> type, Level level) {
+        super(type, level);
     }
 
+    // Note: getDefaultDimensions inject is in PlayerEntityMixin (targets Player/Avatar level, not LivingEntity)
+
     @Inject(
-            method = "onDeath",
+            method = "die",
             at = @At("RETURN")
     )
     private void onDeath(DamageSource source, CallbackInfo ci) {
-        Entity attacker = source.getAttacker();
+        Entity attacker = source.getEntity();
         @Nullable IdentityType<?> thisType = IdentityType.from((LivingEntity) (Object) this);
 
         // check if attacker is a player to grant identity
-        if (attacker instanceof PlayerEntity && thisType != null) {
-            IdentityGranting.grantByAttack((PlayerEntity) attacker, thisType);
+        if (attacker instanceof Player && thisType != null) {
+            IdentityGranting.grantByAttack((Player) attacker, thisType);
         }
     }
-
-    @Inject(method = "baseTick", at = @At("HEAD"))
-    private void identity$preventAirRegenForAquatic(CallbackInfo ci) {
-        if ((Object) this instanceof PlayerEntity player) {
-            LivingEntity identity = PlayerIdentity.getIdentity(player);
-            if (identity$isAquatic(identity) && !player.isSubmergedInWater()) {
-                // Prevent air regen here if needed
-                player.setAir(Math.min(player.getAir(), player.getMaxAir()));
-            }
-        }
-    }
-
-
-
-
-
-
 
     @Redirect(
-            method = "travel",
-            at = @At(value = "INVOKE", target = "Lnet/minecraft/entity/LivingEntity;hasStatusEffect(Lnet/minecraft/entity/effect/StatusEffect;)Z", ordinal = 0)
+            method = "baseTick",
+            at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/LivingEntity;setAirSupply(I)V", ordinal = 3)
     )
-    private boolean slowFall(LivingEntity livingEntity, StatusEffect effect) {
-        if ((Object) this instanceof PlayerEntity player) {
+    private void cancelAirIncrement(LivingEntity livingEntity, int air) {
+        // Aquatic creatures should not regenerate breath on land
+        if ((Object) this instanceof Player player) {
             LivingEntity identity = PlayerIdentity.getIdentity(player);
 
             if (identity != null) {
-                if (!this.isSneaking()) {
-                    EntityType<?> type = identity.getType();
-                    if (type.isIn(IdentityEntityTags.SLOW_FALLING) || SafeTagManager.isCustomSlowFalling(type)) {
-                        return true;
-                    }
+                if (Identity.isAquatic(identity)) {
+                    return;
                 }
             }
         }
 
-        return this.hasStatusEffect(StatusEffects.SLOW_FALLING);
+        this.setAirSupply(this.increaseAirSupply(this.getAirSupply()));
     }
 
-//    @Unique
-//    private boolean identity$isAquatic(LivingEntity identity) {
-//        return identity != null && identity.getType().isIn(IdentityEntityTags.BREATHE_UNDERWATER);
-//    }
+    // Disabled: travel() no longer calls hasEffect() in 26.1
+    // @Redirect(
+    //         method = "travel",
+    //         at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/LivingEntity;hasEffect(Lnet/minecraft/core/Holder;)Z", ordinal = 0)
+    // )
+    // private boolean slowFall(LivingEntity livingEntity, Holder<MobEffect> effect) { ... }
 
-
-
-    @Inject(method = "baseTick", at = @At("HEAD"))
-    private void identity$suffocateAquaticIdentities(CallbackInfo ci) {
-        if ((Object) this instanceof PlayerEntity player) {
-            LivingEntity identity = PlayerIdentity.getIdentity(player);
-
-            if (identity$isAquatic(identity)) {
-                boolean inWater = player.isTouchingWater();
-                boolean inBubbleColumn = player.getWorld().getBlockState(player.getBlockPos()).isOf(Blocks.BUBBLE_COLUMN);
-
-                int air = player.getAir();
-
-                if (!inWater && !inBubbleColumn) {
-                    if (player.age % 40 == 0) { // reduce air every 10 ticks (0.5 sec)
-                        if (air > 0) {
-                            player.setAir(Math.max(air - 15, 0)); // drop by 15 to deplete in ~200 ticks
-                        } else {
-                            player.setAir(-1); // prevent re-damage spam
-                            player.damage(player.getDamageSources().drown(), 2.0F);
-                        }
-                    }
-                } else {
-                    if (air < player.getMaxAir()) {
-                        player.setAir(player.getMaxAir());
-                    }
-                }
-            }
-        }
-
-    }
-    @Redirect(
-            method = "baseTick",
-            at = @At(
-                    value = "INVOKE",
-                    target = "Lnet/minecraft/entity/LivingEntity;getNextAirOnLand(I)I"
-            )
-    )
-    private int identity$cancelAirRegenOnLand(LivingEntity instance, int air) {
-        if ((Object) this instanceof PlayerEntity player) {
-            LivingEntity identity = PlayerIdentity.getIdentity(player);
-
-            if (identity$isAquatic(identity)
-                    && !player.isTouchingWater()
-                    && !player.getWorld().getBlockState(player.getBlockPos()).isOf(Blocks.BUBBLE_COLUMN)) {
-
-                return air;
-            }
-        }
-
-
-        return ((LivingEntityCompatAccessor) instance).identity$getNextAirOnLand(air);
-    }
-
+    // Disabled: travel() no longer calls hasEffect() in 26.1
+    // @ModifyVariable(method = "travel", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/LivingEntity;hasEffect(Lnet/minecraft/core/Holder;)Z", ordinal = 1), ordinal = 0)
+    // public float applyWaterCreatureSwimSpeedBoost(float j) { ... }
 
     @Inject(
-            method = "handleFallDamage",
+            method = "causeFallDamage",
             at = @At(value = "HEAD"),
             cancellable = true
     )
-    private void handleFallDamage(float fallDistance, float damageMultiplier, DamageSource damageSource, CallbackInfoReturnable<Boolean> cir) {
-        if ((Object) this instanceof PlayerEntity player) {
+    private void handleFallDamage(double fallDistance, float damageMultiplier, DamageSource damageSource, CallbackInfoReturnable<Boolean> cir) {
+        if ((Object) this instanceof Player player) {
             LivingEntity identity = PlayerIdentity.getIdentity(player);
 
             if (identity != null) {
-                boolean takesFallDamage = identity.handleFallDamage(fallDistance, damageMultiplier, damageSource);
-                int damageAmount = ((LivingEntityCompatAccessor) identity).callComputeFallDamage(fallDistance, damageMultiplier);
+                boolean takesFallDamage = identity.causeFallDamage(fallDistance, damageMultiplier, damageSource);
+                int damageAmount = ((LivingEntityAccessor) identity).callCalculateFallDamage(fallDistance, damageMultiplier);
 
                 if (takesFallDamage && damageAmount > 0) {
-                    LivingEntity.FallSounds fallSounds = identity.getFallSounds();
+                    LivingEntity.Fallsounds fallSounds = identity.getFallSounds();
                     this.playSound(damageAmount > 4 ? fallSounds.big() : fallSounds.small(), 1.0F, 1.0F);
-                    ((LivingEntityCompatAccessor) identity).callPlayBlockFallSound();
-                    this.damage(getDamageSources().fall(), (float) damageAmount);
+                    ((LivingEntityAccessor) identity).callPlayBlockFallSound();
+                    this.hurt(damageSources().fall(), (float) damageAmount);
                     cir.setReturnValue(true);
                 } else {
                     cir.setReturnValue(false);
@@ -188,17 +120,17 @@ public abstract class LivingEntityMixin extends Entity implements NearbySongAcce
     }
 
     @Inject(
-            method = "hasStatusEffect",
+            method = "hasEffect",
             at = @At("HEAD"),
             cancellable = true
     )
-    private void returnHasNightVision(StatusEffect effect, CallbackInfoReturnable<Boolean> cir) {
-        if ((Object) this instanceof PlayerEntity player) {
-            if (effect.equals(StatusEffects.NIGHT_VISION)) {
+    private void returnHasNightVision(Holder<MobEffect> effect, CallbackInfoReturnable<Boolean> cir) {
+        if ((Object) this instanceof Player player) {
+            if (effect.equals(MobEffects.NIGHT_VISION)) {
                 LivingEntity identity = PlayerIdentity.getIdentity(player);
 
                 // Apply 'Night Vision' status effect to player if they are a Bat
-                if (identity instanceof BatEntity) {
+                if (identity instanceof Bat) {
                     cir.setReturnValue(true);
                 }
             }
@@ -206,76 +138,52 @@ public abstract class LivingEntityMixin extends Entity implements NearbySongAcce
     }
 
     @Inject(
-            method = "getStatusEffect",
+            method = "getEffect",
             at = @At("HEAD"),
             cancellable = true
     )
-    private void returnNightVisionInstance(StatusEffect effect, CallbackInfoReturnable<StatusEffectInstance> cir) {
-        if ((Object) this instanceof PlayerEntity player) {
-            if (effect.equals(StatusEffects.NIGHT_VISION)) {
+    private void returnNightVisionInstance(Holder<MobEffect> effect, CallbackInfoReturnable<MobEffectInstance> cir) {
+        if ((Object) this instanceof Player player) {
+            if (effect.equals(MobEffects.NIGHT_VISION)) {
                 LivingEntity identity = PlayerIdentity.getIdentity(player);
 
                 // Apply 'Night Vision' status effect to player if they are a Bat
-                if (identity instanceof BatEntity) {
-                    cir.setReturnValue(new StatusEffectInstance(StatusEffects.NIGHT_VISION, 100000, 0, false, false));
+                if (identity instanceof Bat) {
+                    cir.setReturnValue(new MobEffectInstance(MobEffects.NIGHT_VISION, 100000, 0, false, false));
                 }
             }
         }
     }
 
-    @Inject(at = @At("HEAD"), method = "getEyeHeight", cancellable = true)
-    public void getEyeHeight(EntityPose pose, EntityDimensions dimensions, CallbackInfoReturnable<Float> cir) {
-        if((LivingEntity) (Object) this instanceof PlayerEntity player) {
-
-            // this is cursed
-            try {
-                LivingEntity identity = PlayerIdentity.getIdentity(player);
-
-                if(identity != null) {
-                    cir.setReturnValue(((LivingEntityCompatAccessor) identity).callGetEyeHeight(pose, dimensions));
-                }
-            } catch (Exception ignored) {}
-        }
-    }
-
-    @Inject(method = "hurtByWater", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "isSensitiveToWater", at = @At("HEAD"), cancellable = true)
     protected void identity_hurtByWater(CallbackInfoReturnable<Boolean> cir) {
-        if((LivingEntity) (Object) this instanceof PlayerEntity player) {
+        if((LivingEntity) (Object) this instanceof Player player) {
             LivingEntity entity = PlayerIdentity.getIdentity(player);
 
             if (entity != null) {
-                cir.setReturnValue(entity.hurtByWater());
+                cir.setReturnValue(entity.isSensitiveToWater());
             }
         }
     }
 
-    @Inject(method = "canBreatheInWater", at = @At("HEAD"), cancellable = true)
-    private void identity_canBreatheInWater(CallbackInfoReturnable<Boolean> cir) {
-        if ((Object) this instanceof PlayerEntity player) {
-            LivingEntity identity = PlayerIdentity.getIdentity(player);
+    @Inject(method = "canBreatheUnderwater", at = @At("HEAD"), cancellable = true)
+    protected void identity_canBreatheInWater(CallbackInfoReturnable<Boolean> cir) {
+        if((LivingEntity) (Object) this instanceof Player player) {
+            LivingEntity entity = PlayerIdentity.getIdentity(player);
 
-            if (identity != null) {
-                if (identity$isAquatic(identity)) {
-                    cir.setReturnValue(true);
-                } else if (identity.getType().isIn(IdentityEntityTags.UNDROWNABLE) || SafeTagManager.isCustomUndrownable(identity.getType())) {
-                    cir.setReturnValue(true);
-                } else {
-                    cir.setReturnValue(false);
-                }
+            if (entity != null) {
+                cir.setReturnValue(entity.canBreatheUnderwater() || entity instanceof Dolphin || entity.getType().builtInRegistryHolder().is(IdentityEntityTags.UNDROWNABLE));
             }
         }
     }
-
-
-
 
     @Unique
     private boolean nearbySongPlaying = false;
 
     @Environment(EnvType.CLIENT)
-    @Inject(method = "setNearbySongPlaying", at = @At("RETURN"))
+    @Inject(method = "setRecordPlayingNearby", at = @At("RETURN"))
     protected void identity_setNearbySongPlaying(BlockPos songPosition, boolean playing, CallbackInfo ci) {
-        if((LivingEntity) (Object) this instanceof PlayerEntity player) {
+        if((LivingEntity) (Object) this instanceof Player player) {
             nearbySongPlaying = playing;
         }
     }
@@ -285,38 +193,38 @@ public abstract class LivingEntityMixin extends Entity implements NearbySongAcce
         return nearbySongPlaying;
     }
 
-    @Inject(method = "isUndead", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "isInvertedHealAndHarm", at = @At("HEAD"), cancellable = true)
     protected void identity_isUndead(CallbackInfoReturnable<Boolean> cir) {
-        if((LivingEntity) (Object) this instanceof PlayerEntity player) {
+        if((LivingEntity) (Object) this instanceof Player player) {
             LivingEntity identity = PlayerIdentity.getIdentity(player);
 
             if (identity != null) {
-                cir.setReturnValue(identity.isUndead());
+                cir.setReturnValue(identity.isInvertedHealAndHarm());
             }
         }
     }
 
-    @Inject(method = "canWalkOnFluid", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "canStandOnFluid", at = @At("HEAD"), cancellable = true)
     protected void identity_canWalkOnFluid(FluidState state, CallbackInfoReturnable<Boolean> cir) {
-        if((LivingEntity) (Object) this instanceof PlayerEntity player) {
+        if((LivingEntity) (Object) this instanceof Player player) {
             LivingEntity identity = PlayerIdentity.getIdentity(player);
 
-            if (identity != null && identity.getType().isIn(IdentityEntityTags.LAVA_WALKING) && state.isIn(FluidTags.LAVA)) {
+            if (identity != null && identity.getType().builtInRegistryHolder().is(IdentityEntityTags.LAVA_WALKING) && state.is(FluidTags.LAVA)) {
                 cir.setReturnValue(true);
             }
         }
     }
 
     @Inject(
-            method = "isClimbing",
+            method = "onClimbable",
             at = @At("HEAD"),
             cancellable = true
     )
     protected void identity_allowSpiderClimbing(CallbackInfoReturnable<Boolean> cir) {
-        if((LivingEntity) (Object) this instanceof PlayerEntity player) {
+        if((LivingEntity) (Object) this instanceof Player player) {
             LivingEntity identity = PlayerIdentity.getIdentity(player);
 
-            if (identity instanceof SpiderEntity) {
+            if (identity instanceof Spider) {
                 cir.setReturnValue(this.horizontalCollision);
             }
         }

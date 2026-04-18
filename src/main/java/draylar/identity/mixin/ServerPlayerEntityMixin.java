@@ -5,45 +5,28 @@ import draylar.identity.Identity;
 import draylar.identity.api.PlayerIdentity;
 import draylar.identity.api.PlayerUnlocks;
 import draylar.identity.api.FlightHelper;
-import draylar.identity.api.platform.IdentityConfig;
-import net.Gabou.gaboulibs.util.PlayerDebugUtils;
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.damage.DamageSource;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.network.encryption.PlayerPublicKey;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.text.Text;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Box;
-import net.minecraft.world.GameMode;
-import net.minecraft.world.World;
-import org.jetbrains.annotations.Nullable;
+import draylar.identity.config.IdentityConfig;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.level.Level;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-@Mixin(ServerPlayerEntity.class)
-public abstract class ServerPlayerEntityMixin extends PlayerEntity {
+@Mixin(ServerPlayer.class)
+public abstract class ServerPlayerEntityMixin extends Player {
 
-    @Shadow
-    public abstract boolean isCreative();
-
-    @Shadow
-    public abstract boolean isSpectator();
-
-    @Shadow
-    public abstract void sendMessage(Text message, boolean actionBar);
-
-    public ServerPlayerEntityMixin(World world, BlockPos pos, float yaw, GameProfile gameProfile) {
-        super(world, pos, yaw, gameProfile);
+    public ServerPlayerEntityMixin(Level level, GameProfile gameProfile) {
+        super(level, gameProfile);
     }
 
     @Inject(
-            method = "onDeath",
+            method = "die",
             at = @At("HEAD")
     )
     private void revokeIdentityOnDeath(DamageSource source, CallbackInfo ci) {
@@ -51,18 +34,18 @@ public abstract class ServerPlayerEntityMixin extends PlayerEntity {
             LivingEntity entity = PlayerIdentity.getIdentity(this);
 
             // revoke the identity current equipped by the player
-            if (entity != null) {
+            if(entity != null) {
                 EntityType<?> type = entity.getType();
-                PlayerUnlocks.revoke((ServerPlayerEntity) (Object) this, PlayerIdentity.getIdentityType(this));
-                PlayerIdentity.updateIdentity((ServerPlayerEntity) (Object) this, null, null);
+                PlayerUnlocks.revoke((ServerPlayer) (Object) this, PlayerIdentity.getIdentityType(this));
+                PlayerIdentity.updateIdentity((ServerPlayer) (Object) this, null,null);
 
                 // todo: this option might be server-only given that this method isn't[?] called on the client
                 // send revoke message to player if they aren't in creative and the config option is on
-                if (IdentityConfig.getInstance().overlayIdentityRevokes()) {
-                    sendMessage(
-                            Text.translatable(
+                if(IdentityConfig.getInstance().overlayIdentityRevokes()) {
+                    ((ServerPlayer) (Object) this).sendSystemMessage(
+                            Component.translatable(
                                     "identity.revoke_entity",
-                                    type.getTranslationKey()
+                                    type.getDescriptionId()
                             ), true
                     );
                 }
@@ -71,56 +54,24 @@ public abstract class ServerPlayerEntityMixin extends PlayerEntity {
     }
 
     @Inject(
-            method = "onSpawn()V",
+            method = "initInventoryMenu",
             at = @At("HEAD")
     )
     private void onSpawn(CallbackInfo ci) {
-        ServerPlayerEntity player = (ServerPlayerEntity) (Object) this;
-
-        // Force dimension recalculation (important!)
-        this.calculateDimensions();
-
-        // Réactiver le vol si nécessaire
-        if (Identity.hasFlyingPermissions(player)) {
-            if (!FlightHelper.hasFlight(player)) {
+        ServerPlayer player = (ServerPlayer) (Object) this;
+        if(Identity.hasFlyingPermissions(player)) {
+            if(!FlightHelper.hasFlight(player)) {
                 FlightHelper.grantFlightTo(player);
-                getAbilities().setFlySpeed(IdentityConfig.getInstance().flySpeed());
-                sendAbilitiesUpdate();
+                getAbilities().setFlyingSpeed(IdentityConfig.getInstance().flySpeed());
+                onUpdateAbilities();
             }
-            FlightHelper.grantFlightTo(player);
-        }
-    }
 
-    @Inject(method = "onDeath", at = @At("RETURN"))
-    private void identity$handleDeath(DamageSource source, CallbackInfo ci) {
-        if ((Object) this instanceof ServerPlayerEntity player) {
-            // Optional: store anything temporarily if needed
+            FlightHelper.grantFlightTo(player);
         }
     }
 
     @Inject(method = "copyFrom", at = @At("RETURN"))
-    private void identity$restoreAfterRespawn(ServerPlayerEntity oldPlayer, boolean alive, CallbackInfo ci) {
-        PlayerIdentity.sync((ServerPlayerEntity) (Object) this);
+    private void identity$restoreAfterRespawn(ServerPlayer oldPlayer, boolean alive, CallbackInfo ci) {
+        PlayerIdentity.sync((ServerPlayer) (Object) this);
     }
-
-    @Inject(method = "changeGameMode", at = @At("TAIL"))
-    private void identity$onGameModeChange(GameMode newMode, CallbackInfoReturnable<Boolean> cir) {
-        ServerPlayerEntity player = (ServerPlayerEntity) (Object) this;
-
-        if (Identity.hasFlyingPermissions(player)) {
-            FlightHelper.grantFlightTo(player);
-            getAbilities().setFlySpeed(IdentityConfig.getInstance().flySpeed());
-        } else {
-            if (!player.isCreative() && !player.isSpectator()) {
-                FlightHelper.revokeFlight(player);
-                getAbilities().setFlySpeed(0.05f);
-            }
-        }
-        sendAbilitiesUpdate();
-    }
-//    @Inject(method = "tick", at = @At("TAIL"))
-//    private void onServerTick(CallbackInfo ci) {
-//        PlayerDebugUtils.logPlayerDebug((PlayerEntity)(Object)this, "server");
-//    }
-
 }

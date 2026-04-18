@@ -1,40 +1,39 @@
 package draylar.identity.mixin;
 
 import draylar.identity.api.PlayerIdentity;
-import draylar.identity.api.SafeTagManager;
-import draylar.identity.api.platform.IdentityConfig;
+import draylar.identity.config.IdentityConfig;
 import draylar.identity.registry.IdentityEntityTags;
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.ai.goal.ActiveTargetGoal;
-import net.minecraft.entity.passive.TameableEntity;
-import net.minecraft.entity.passive.WolfEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.world.World;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.goal.target.NearestAttackableTargetGoal;
+import net.minecraft.world.entity.TamableAnimal;
+import net.minecraft.world.entity.animal.wolf.Wolf;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.Level;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-@Mixin(WolfEntity.class)
-public abstract class WolfEntityMixin extends TameableEntity {
+@Mixin(Wolf.class)
+public abstract class WolfEntityMixin extends TamableAnimal {
 
-    private WolfEntityMixin(EntityType<? extends TameableEntity> entityType, World world) {
-        super(entityType, world);
+    private WolfEntityMixin(EntityType<? extends TamableAnimal> entityType, Level level) {
+        super(entityType, level);
     }
 
     @Inject(
-            method = "initGoals",
+            method = "registerGoals",
             at = @At("RETURN")
     )
     private void addPlayerTarget(CallbackInfo ci) {
-        this.targetSelector.add(7, new ActiveTargetGoal<>(this, PlayerEntity.class, 10, false, false, player -> {
+        this.targetSelector.addGoal(7, new NearestAttackableTargetGoal<>(this, Player.class, 10, false, false, (player, serverLevel) -> {
             // ensure wolves can attack players with an identity similar to their normal prey
             if(!IdentityConfig.getInstance().wolvesAttackIdentityPrey()) {
                 return false;
             }
 
-            LivingEntity identity = PlayerIdentity.getIdentity((PlayerEntity) player);
+            LivingEntity identity = PlayerIdentity.getIdentity((Player) player);
 
             // wolves should ignore players that look like their prey if they have an owner,
             // unless the config option is turned to true
@@ -43,10 +42,7 @@ public abstract class WolfEntityMixin extends TameableEntity {
                 return false;
             }
 
-            return identity != null && (
-                    identity.getType().isIn(IdentityEntityTags.WOLF_PREY) ||
-                            SafeTagManager.isCustomWolfPrey(identity.getType())
-            );
+            return identity != null && identity.getType().builtInRegistryHolder().is(IdentityEntityTags.WOLF_PREY);
         }));
     }
 }
