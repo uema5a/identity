@@ -1,38 +1,39 @@
 package draylar.identity.impl.variant;
 
 import draylar.identity.api.variant.TypeProvider;
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.passive.FoxEntity;
-import net.minecraft.text.MutableText;
-import net.minecraft.text.Text;
-import net.minecraft.world.World;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.entity.animal.fox.Fox;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.level.Level;
 
-public class FoxTypeProvider extends TypeProvider<FoxEntity> {
+public class FoxTypeProvider extends TypeProvider<Fox> {
 
     @Override
-    public int getVariantData(FoxEntity entity) {
+    public int getVariantData(Fox entity) {
         return entity.getVariant().getId();
     }
 
     @Override
-    public FoxEntity create(EntityType<FoxEntity> type, World world, int data) {
-        FoxEntity fox = new FoxEntity(type, world);
-        fox.setVariant(FoxEntity.Type.fromId(data));
+    public Fox create(EntityType<Fox> type, Level level, int data) {
+        // Fox.setVariant is private in 26.1 - variant must be set via NBT or accessor
+        Fox fox = type.create(level, EntitySpawnReason.COMMAND);
         return fox;
     }
 
     @Override
     public int getFallbackData() {
-        return FoxEntity.Type.RED.getId();
+        return Fox.Variant.RED.getId();
     }
 
     @Override
     public int getRange() {
-        return FoxEntity.Type.values().length - 1;
+        return Fox.Variant.values().length - 1;
     }
 
     @Override
-    public Text modifyText(FoxEntity entity, MutableText text) {
-        return Text.literal(formatTypePrefix(FoxEntity.Type.fromId(getVariantData(entity)).asString()) + " ").append(text);
+    public Component modifyText(Fox entity, MutableComponent text) {
+        return Component.literal(formatTypePrefix(Fox.Variant.byId(getVariantData(entity)).getSerializedName()) + " ").append(text);
     }
 }
