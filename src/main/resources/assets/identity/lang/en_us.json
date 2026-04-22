@@ -57,5 +57,7 @@
   "identity.config.equip_items": "Identities Equip Items",
   "identity.config.enable_flight": "Enable Flight",
   "identity.config.revoke_on_death": "Revoke Identity on Death",
-  "identity.config.show_nametag": "Show Player Nametag"
+  "identity.config.show_nametag": "Show Player Nametag",
+  "death.attack.axolotl_grass": "%1$s realized the floor was grass",
+  "death.attack.axolotl_grass.player": "%1$s realized the floor was grass while fighting %2$s"
 }
