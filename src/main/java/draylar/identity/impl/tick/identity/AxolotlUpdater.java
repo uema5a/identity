@@ -24,8 +24,8 @@ public class AxolotlUpdater implements EntityUpdater<Axolotl> {
         axolotl.onGroundAnimator.tick(onGround);
         axolotl.movingAnimator.tick(moving);
 
-        // Advance the dummy entity's tick counter so AnimationState progression has a clock.
-        axolotl.tickCount++;
+        // tickCount is synced to player.tickCount every frame by PlayerEntityRendererMixin.identity_syncPlayerToIdentity,
+        // so AnimationState progression uses the player's monotonic clock.
         int t = axolotl.tickCount;
 
         axolotl.swimAnimationState.animateWhen(inWater && moving, t);

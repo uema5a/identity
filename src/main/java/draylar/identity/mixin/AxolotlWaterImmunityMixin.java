@@ -2,6 +2,7 @@ package draylar.identity.mixin;
 
 import draylar.identity.api.PlayerIdentity;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.tags.DamageTypeTags;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.animal.axolotl.Axolotl;
@@ -14,9 +15,17 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Mixin(Player.class)
 public abstract class AxolotlWaterImmunityMixin {
 
-    @Inject(method = "hurtServer", at = @At("HEAD"), cancellable = true)
+    @Inject(
+            method = "hurtServer(Lnet/minecraft/server/level/ServerLevel;Lnet/minecraft/world/damagesource/DamageSource;F)Z",
+            at = @At("HEAD"),
+            cancellable = true
+    )
     private void identity$axolotlWaterImmunity(ServerLevel level, DamageSource source, float amount,
                                                CallbackInfoReturnable<Boolean> cir) {
+        // Don't block /kill, void, out_of_world, or other invulnerability-bypassing damage.
+        if (source.is(DamageTypeTags.BYPASSES_INVULNERABILITY)) {
+            return;
+        }
         Player player = (Player) (Object) this;
         LivingEntity identity = PlayerIdentity.getIdentity(player);
         if (identity instanceof Axolotl && player.isInWater()) {

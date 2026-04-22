@@ -366,10 +366,12 @@ public abstract class PlayerEntityDataMixin extends LivingEntity implements Play
         // update flight properties on player depending on identity
         ServerPlayer serverPlayerEntity = (ServerPlayer) player;
         boolean canFly = Identity.hasFlyingPermissions(serverPlayerEntity);
-        Identity.LOGGER.info("[Identity] Swap flight update: identity={}, isBaby={}, canFly={}, wasMayfly={}",
-                identity == null ? "null" : identity.getType().toString(),
-                identity instanceof net.minecraft.world.entity.AgeableMob a ? a.isBaby() : "N/A",
-                canFly, player.getAbilities().mayfly);
+        if (Identity.LOGGER.isDebugEnabled()) {
+            Identity.LOGGER.debug("[Identity] Swap flight update: identity={}, isBaby={}, canFly={}, wasMayfly={}",
+                    identity == null ? "null" : identity.getType().toString(),
+                    identity instanceof net.minecraft.world.entity.AgeableMob a ? a.isBaby() : "N/A",
+                    canFly, player.getAbilities().mayfly);
+        }
         if (canFly) {
             FlightHelper.grantFlightTo(serverPlayerEntity);
             player.getAbilities().setFlyingSpeed(IdentityConfig.getInstance().flySpeed());
