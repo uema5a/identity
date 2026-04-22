@@ -84,6 +84,18 @@ public abstract class LivingEntitySubmitMixin extends EntityRenderer {
             identityRenderState.z = renderState.z;
             identityRenderState.distanceToCameraSq = renderState.distanceToCameraSq;
 
+            // Inherit the player's rotation/animation state — inventory preview rotates the player
+            // via its render state, so copying these keeps the identity entity facing the same way.
+            if (identityRenderState instanceof LivingEntityRenderState livingIdentityState) {
+                livingIdentityState.bodyRot = renderState.bodyRot;
+                livingIdentityState.yRot = renderState.yRot;
+                livingIdentityState.xRot = renderState.xRot;
+                livingIdentityState.walkAnimationPos = renderState.walkAnimationPos;
+                livingIdentityState.walkAnimationSpeed = renderState.walkAnimationSpeed;
+                livingIdentityState.isInWater = renderState.isInWater;
+                livingIdentityState.pose = renderState.pose;
+            }
+
             identityRenderer.submit(identityRenderState, poseStack, collector, cameraState);
 
             boolean showThisPlayerNametag = player != mc.player || IdentityConfig.getInstance().shouldRenderOwnNameTag();
