@@ -6,6 +6,7 @@
   "mixins": [
     "ActiveTargetGoalMixin",
     "AvatarDimensionsMixin",
+    "ChickMiningSpeedMixin",
     "CreeperEntityMixin",
     "EntityMixin",
     "EntityTrackerAccessor",

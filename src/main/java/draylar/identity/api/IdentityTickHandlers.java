@@ -1,5 +1,6 @@
 package draylar.identity.api;
 
+import draylar.identity.impl.tick.identity.ChickTickHandler;
 import draylar.identity.impl.tick.identity.FrogTickHandler;
 import draylar.identity.impl.tick.identity.JumpBoostTickHandler;
 import draylar.identity.impl.tick.identity.WardenTickHandler;
@@ -14,6 +15,7 @@ public class IdentityTickHandlers {
     private static final Map<EntityType<?>, IdentityTickHandler<?>> HANDLERS = new HashMap<>();
 
     public static void initialize() {
+        register(EntityType.CHICKEN, new ChickTickHandler());
         register(EntityType.WARDEN, new WardenTickHandler());
         register(EntityType.FROG, new FrogTickHandler());
         register(EntityType.RABBIT, new JumpBoostTickHandler<>(1));
