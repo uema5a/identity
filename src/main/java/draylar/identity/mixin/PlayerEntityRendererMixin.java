@@ -55,33 +55,40 @@ public abstract class PlayerEntityRendererMixin extends LivingEntityRenderer {
             at = @At("TAIL")
     )
     private void identity_onExtractRenderState(Avatar avatarEntity, AvatarRenderState state, float partialTick, CallbackInfo ci) {
-        // Only clear cache for non-Player avatars if we had a cached entry from a prior extract; otherwise leave alone.
+        // Non-Player avatars do not affect our cache (leave it alone so inventory / sub-pass renders still work).
         if (!(avatarEntity instanceof Player player)) {
             return;
         }
 
         LivingEntity identity = PlayerIdentity.getIdentity(player);
         if (identity == null) {
-            IdentityRenderCache.cachedIdentity = null;
+            // This player has no identity: clear the cache so submit falls through to vanilla.
             IdentityRenderCache.cachedPlayer = null;
+            IdentityRenderCache.cachedIdentity = null;
             return;
         }
 
-        try {
-
+        // Set cache eagerly so submit can use it even if sync below throws.
+        // Submit fetches identity fresh via PlayerIdentity.getIdentity(cachedPlayer) and ignores cachedIdentity,
+        // but we still populate cachedIdentity for any legacy readers.
         IdentityRenderCache.cachedPlayer = player;
         IdentityRenderCache.cachedPartialTick = partialTick;
-        identity_syncPlayerToIdentity(player, identity);
+        IdentityRenderCache.cachedIdentity = identity;
 
-        @SuppressWarnings("unchecked")
-        EntityUpdater<LivingEntity> entityUpdater = (EntityUpdater<LivingEntity>) EntityUpdaters.getUpdater((EntityType<? extends LivingEntity>) identity.getType());
-        if (entityUpdater != null) {
-            entityUpdater.update(player, identity);
+        try {
+            identity_syncPlayerToIdentity(player, identity);
+        } catch (Throwable t) {
+            draylar.identity.Identity.LOGGER.warn("[Identity] syncPlayerToIdentity failed for {}", identity.getType(), t);
         }
 
-        IdentityRenderCache.cachedIdentity = identity;
+        try {
+            @SuppressWarnings("unchecked")
+            EntityUpdater<LivingEntity> entityUpdater = (EntityUpdater<LivingEntity>) EntityUpdaters.getUpdater((EntityType<? extends LivingEntity>) identity.getType());
+            if (entityUpdater != null) {
+                entityUpdater.update(player, identity);
+            }
         } catch (Throwable t) {
-            draylar.identity.Identity.LOGGER.warn("[Identity] extractRenderState failed", t);
+            draylar.identity.Identity.LOGGER.warn("[Identity] EntityUpdater failed for {}", identity.getType(), t);
         }
     }
 
