@@ -6,7 +6,10 @@ import draylar.identity.api.PlayerFavorites;
 import draylar.identity.api.PlayerIdentity;
 import draylar.identity.api.PlayerUnlocks;
 import draylar.identity.api.SafeTagManager;
+import draylar.identity.api.event.IdentitySwapCallback;
 import draylar.identity.config.IdentityConfig;
+import draylar.identity.impl.tick.identity.BeeTickHandler;
+import draylar.identity.impl.tick.identity.ChickTickHandler;
 import draylar.identity.network.NetworkHandler.ConfigSyncPayload;
 import draylar.identity.network.ServerNetworking;
 import draylar.identity.registry.IdentityCommands;
@@ -20,8 +23,11 @@ import net.minecraft.advancements.AdvancementProgress;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.attributes.AttributeInstance;
+import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.animal.fish.WaterAnimal;
 import net.minecraft.world.entity.monster.Guardian;
 import org.slf4j.Logger;
@@ -43,8 +49,22 @@ public class Identity {
         ServerNetworking.registerUseAbilityPacketHandler();
         registerJoinSyncPacket();
         IdentityTickHandlers.initialize();
+        registerAttributeCleanupOnSwap();
         ServerLifecycleEvents.SERVER_STARTING.register(server -> {
             SafeTagManager.loadAll();
+        });
+    }
+
+    // Remove transient attribute modifiers applied by tick handlers when the player's identity changes,
+    // so buffs/debuffs don't leak across swaps (handlers only fire when the matching identity is active).
+    private static void registerAttributeCleanupOnSwap() {
+        IdentitySwapCallback.EVENT.register((player, to) -> {
+            AttributeInstance speed = player.getAttribute(Attributes.MOVEMENT_SPEED);
+            if (speed != null) {
+                speed.removeModifier(ChickTickHandler.SPEED_MODIFIER_ID);
+                speed.removeModifier(BeeTickHandler.SLOWNESS_MODIFIER_ID);
+            }
+            return InteractionResult.PASS;
         });
     }
 
