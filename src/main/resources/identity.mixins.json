@@ -6,6 +6,9 @@
   "mixins": [
     "ActiveTargetGoalMixin",
     "AvatarDimensionsMixin",
+    "CowFoodRestorationMixin",
+    "CowHungerMixin",
+    "CowTridentDamageMixin",
     "CreeperEntityMixin",
     "EntityMixin",
     "EntityTrackerAccessor",
@@ -31,6 +34,7 @@
     "VillagerHostilesSensorMixin",
     "WitherEntityMixin",
     "WolfEntityMixin",
+    "accessor.AbstractArrowAccessor",
     "accessor.AxolotlEntityAccessor",
     "accessor.CreeperEntityAccessor",
     "accessor.EntityAccessor",
