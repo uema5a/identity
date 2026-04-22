@@ -6,6 +6,9 @@
   "mixins": [
     "ActiveTargetGoalMixin",
     "AvatarDimensionsMixin",
+    "CowFoodRestorationMixin",
+    "CowHungerMixin",
+    "CowTridentDamageMixin",
     "CreeperEntityMixin",
     "EntityMixin",
     "EntityTrackerAccessor",
