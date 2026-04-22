@@ -51,6 +51,11 @@ public abstract class PlayerEntityTickMixin extends LivingEntity {
             // Sync flight abilities with identity state
             boolean shouldAllowFlight = Identity.hasFlyingPermissions(player);
             if (shouldAllowFlight != player.getAbilities().mayfly) {
+                LivingEntity idDbg = draylar.identity.api.PlayerIdentity.getIdentity(player);
+                Identity.LOGGER.info("[Identity] Flight sync: identity={}, isBaby={}, shouldAllow={}, prevMayfly={}",
+                        idDbg == null ? "null" : idDbg.getType().toString(),
+                        idDbg instanceof net.minecraft.world.entity.AgeableMob a ? a.isBaby() : "N/A",
+                        shouldAllowFlight, player.getAbilities().mayfly);
                 if (shouldAllowFlight) {
                     FlightHelper.grantFlightTo(player);
                     player.getAbilities().setFlyingSpeed(IdentityConfig.getInstance().flySpeed());
