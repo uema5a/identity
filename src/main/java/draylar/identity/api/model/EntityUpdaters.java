@@ -52,10 +52,8 @@ public class EntityUpdaters {
     }
 
     public static void init() {
-        // TODO: Phase 5 - Rewrite entity updater registrations for MC 26.1
-        // Many field names and methods changed (Yarn -> Mojang):
-        // - setRoosting, prevFlapProgress, flapProgress, wingPosition, segmentCircularBuffer, etc.
-        // - getMainHandItem -> getMainHandItem, getDefaultState -> defaultBlockState
-        // Original registrations: BAT, PARROT, ENDER_DRAGON, ENDERMAN, CREEPER
+        register(net.minecraft.world.entity.EntityType.AXOLOTL,
+                new draylar.identity.impl.tick.identity.AxolotlUpdater());
+        // TODO Phase F: port BAT/PARROT/ENDER_DRAGON/ENDERMAN/CREEPER + add FROG/WARDEN/CAMEL/ALLAY etc.
     }
 }
