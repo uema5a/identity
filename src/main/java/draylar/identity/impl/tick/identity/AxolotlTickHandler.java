@@ -18,6 +18,15 @@ public class AxolotlTickHandler implements IdentityTickHandler<Axolotl> {
             Identifier.fromNamespaceAndPath(Identity.MODID, "axolotl_grass")
     );
 
+    private static boolean loggedMissingDamageType = false;
+
+    private static void logMissingOnce() {
+        if (!loggedMissingDamageType) {
+            loggedMissingDamageType = true;
+            Identity.LOGGER.warn("Identity damage_type 'axolotl_grass' not in registry; grass damage disabled");
+        }
+    }
+
     @Override
     public void tick(Player player, Axolotl axolotl) {
         var level = player.level();
@@ -30,10 +39,13 @@ public class AxolotlTickHandler implements IdentityTickHandler<Axolotl> {
         if (player.tickCount % 20 == 0 && player.onGround()) {
             var below = player.blockPosition().below();
             if (level.getBlockState(below).is(Blocks.GRASS_BLOCK)) {
-                var holder = level.registryAccess()
-                        .lookupOrThrow(Registries.DAMAGE_TYPE)
-                        .getOrThrow(GRASS_DAMAGE);
-                player.hurt(new DamageSource(holder), 1.0F);
+                var registry = level.registryAccess().lookupOrThrow(Registries.DAMAGE_TYPE);
+                var holder = registry.get(GRASS_DAMAGE);
+                if (holder.isPresent()) {
+                    player.hurt(new DamageSource(holder.get()), 1.0F);
+                } else {
+                    logMissingOnce();
+                }
             }
         }
     }

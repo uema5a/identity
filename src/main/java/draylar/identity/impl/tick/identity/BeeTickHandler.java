@@ -20,11 +20,11 @@ public class BeeTickHandler implements IdentityTickHandler<Bee> {
 
     @Override
     public void tick(Player player, Bee bee) {
+        if (player.level().isClientSide()) return;
+
         boolean wet = player.isInWater() || player.level().isRainingAt(player.blockPosition());
         var abilities = player.getAbilities();
 
-        // Flying speed write: run on BOTH sides so wet→dry transitions feel instantaneous on the
-        // local client too. Server-side write still syncs via onUpdateAbilities as the source of truth.
         if (abilities.mayfly) {
             float configured = IdentityConfig.getInstance().flySpeed();
             float target = wet ? configured * WET_FLYING_SPEED_FACTOR : configured;
@@ -35,9 +35,6 @@ public class BeeTickHandler implements IdentityTickHandler<Bee> {
                 }
             }
         }
-
-        // Attribute modifiers are server-authoritative; bail on client for the rest.
-        if (player.level().isClientSide()) return;
 
         AttributeInstance speed = player.getAttribute(Attributes.MOVEMENT_SPEED);
         if (speed != null) {

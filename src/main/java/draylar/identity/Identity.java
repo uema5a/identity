@@ -28,6 +28,7 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.animal.bee.Bee;
 import net.minecraft.world.entity.animal.fish.WaterAnimal;
 import net.minecraft.world.entity.monster.Guardian;
 import org.slf4j.Logger;
@@ -68,6 +69,11 @@ public class Identity {
             AttributeInstance maxHealth = player.getAttribute(Attributes.MAX_HEALTH);
             if (maxHealth != null) {
                 maxHealth.removeModifier(ChickTickHandler.MAX_HEALTH_MODIFIER_ID);
+            }
+            // Clear sprint flag immediately on swap to Bee so the flag doesn't
+            // propagate to other clients for the ~1 tick before BeeSprintPreventionMixin engages.
+            if (to instanceof Bee && player.isSprinting()) {
+                player.setSprinting(false);
             }
             return InteractionResult.PASS;
         });
