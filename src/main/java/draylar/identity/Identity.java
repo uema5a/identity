@@ -63,6 +63,7 @@ public class Identity {
             if (speed != null) {
                 speed.removeModifier(ChickTickHandler.SPEED_MODIFIER_ID);
                 speed.removeModifier(BeeTickHandler.SLOWNESS_MODIFIER_ID);
+                speed.removeModifier(draylar.identity.impl.tick.identity.CowTickHandler.SPRINT_SPEED_MODIFIER_ID);
             }
             AttributeInstance maxHealth = player.getAttribute(Attributes.MAX_HEALTH);
             if (maxHealth != null) {
