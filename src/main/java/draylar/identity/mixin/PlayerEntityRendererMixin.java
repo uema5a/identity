@@ -2,7 +2,7 @@ package draylar.identity.mixin;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.datafixers.util.Pair;
-import draylar.identity.api.IdentityRenderCache;
+import draylar.identity.api.IdentityStateHolder;
 import draylar.identity.api.PlayerIdentity;
 import draylar.identity.api.model.ArmRenderingManipulator;
 import draylar.identity.api.model.EntityArms;
@@ -55,25 +55,26 @@ public abstract class PlayerEntityRendererMixin extends LivingEntityRenderer {
             at = @At("TAIL")
     )
     private void identity_onExtractRenderState(Avatar avatarEntity, AvatarRenderState state, float partialTick, CallbackInfo ci) {
-        // Non-Player avatars do not affect our cache (leave it alone so inventory / sub-pass renders still work).
+        // Non-Player avatars carry no identity state.
         if (!(avatarEntity instanceof Player player)) {
             return;
         }
 
         LivingEntity identity = PlayerIdentity.getIdentity(player);
+        IdentityStateHolder holder = (IdentityStateHolder) state;
         if (identity == null) {
-            // This player has no identity: clear the cache so submit falls through to vanilla.
-            IdentityRenderCache.cachedPlayer = null;
-            IdentityRenderCache.cachedIdentity = null;
+            // This player has no identity: clear per-state cache so submit falls through to vanilla.
+            holder.identity$setCachedPlayer(null);
+            holder.identity$setCachedIdentity(null);
             return;
         }
 
-        // Set cache eagerly so submit can use it even if sync below throws.
-        // Submit fetches identity fresh via PlayerIdentity.getIdentity(cachedPlayer) and ignores cachedIdentity,
-        // but we still populate cachedIdentity for any legacy readers.
-        IdentityRenderCache.cachedPlayer = player;
-        IdentityRenderCache.cachedPartialTick = partialTick;
-        IdentityRenderCache.cachedIdentity = identity;
+        // Store per-state: each AvatarRenderState carries its own identity data,
+        // preventing cross-contamination when multiple players are extracted before submit runs.
+        // cachedIdentity is also read by getRenderOffset (TamableAnimal sitting-offset bypass).
+        holder.identity$setCachedPlayer(player);
+        holder.identity$setCachedPartialTick(partialTick);
+        holder.identity$setCachedIdentity(identity);
 
         try {
             identity_syncPlayerToIdentity(player, identity);
@@ -159,7 +160,7 @@ public abstract class PlayerEntityRendererMixin extends LivingEntityRenderer {
     )
     private void identity_modifyPositionOffset(AvatarRenderState state, CallbackInfoReturnable<Vec3> cir) {
         // TamableAnimal renderers apply a sitting offset; bypass it so the player stays at ground level
-        if (IdentityRenderCache.cachedIdentity instanceof TamableAnimal) {
+        if (((IdentityStateHolder) state).identity$getCachedIdentity() instanceof TamableAnimal) {
             cir.setReturnValue(super.getRenderOffset(state));
         }
     }

@@ -2,7 +2,7 @@ package draylar.identity.mixin;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import draylar.identity.Identity;
-import draylar.identity.api.IdentityRenderCache;
+import draylar.identity.api.IdentityStateHolder;
 import draylar.identity.api.PlayerIdentity;
 import draylar.identity.config.IdentityConfig;
 import net.minecraft.client.Minecraft;
@@ -26,13 +26,13 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * Mixin into {@link LivingEntityRenderer}'s {@code submit} to redirect
  * rendering of a player that has an identity to the identity entity's renderer.
  *
- * <p>This intentionally DOES NOT clear the cache after use. Each extract pass
- * from {@link PlayerEntityRendererMixin} overwrites cache for the next frame,
- * or clears it when identity becomes null. Not clearing here means inventory
- * preview / subsequent sub-passes in the same frame can also render the identity.
+ * <p>Per-player state (player reference, partialTick) is read from the
+ * {@link draylar.identity.api.IdentityStateHolder} fields injected onto
+ * {@code AvatarRenderState} by {@code AvatarRenderStateMixin}, which guarantees
+ * 1:1 mapping even when multiple players are extracted before any submit runs.
  *
- * <p>Identity lookup is fresh via {@code PlayerIdentity.getIdentity(cachedPlayer)},
- * so an identity swap that happens between extract and submit is reflected.
+ * <p>Identity is fetched fresh via {@code PlayerIdentity.getIdentity(player)}
+ * so swaps that occur between extract and submit are reflected immediately.
  */
 @SuppressWarnings("rawtypes")
 @Mixin(LivingEntityRenderer.class)
@@ -54,7 +54,8 @@ public abstract class LivingEntitySubmitMixin extends EntityRenderer {
             return;
         }
 
-        Player player = IdentityRenderCache.cachedPlayer;
+        IdentityStateHolder holder = (IdentityStateHolder) renderState;
+        Player player = holder.identity$getCachedPlayer();
         if (player == null) {
             return;
         }
@@ -65,7 +66,7 @@ public abstract class LivingEntitySubmitMixin extends EntityRenderer {
             return;
         }
 
-        float partialTick = IdentityRenderCache.cachedPartialTick;
+        float partialTick = holder.identity$getCachedPartialTick();
 
         try {
             Minecraft mc = Minecraft.getInstance();
