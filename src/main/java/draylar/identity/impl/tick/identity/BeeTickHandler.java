@@ -11,12 +11,12 @@ import net.minecraft.world.entity.player.Player;
 
 public class BeeTickHandler implements IdentityTickHandler<Bee> {
 
-    // -15% ground speed (matches vanilla Slowness I) applied while wet.
+    // -30% ground speed while wet (water or rain).
     public static final Identifier SLOWNESS_MODIFIER_ID =
             Identifier.fromNamespaceAndPath("identity", "bee_wet_slowness");
 
-    // Fraction of configured fly speed while wet.
-    private static final float WET_FLYING_SPEED_FACTOR = 0.5F;
+    // Fly speed multiplier while wet — 0.7 matches the -30% ground slowness.
+    private static final float WET_FLYING_SPEED_FACTOR = 0.7F;
 
     @Override
     public void tick(Player player, Bee bee) {
@@ -45,7 +45,7 @@ public class BeeTickHandler implements IdentityTickHandler<Bee> {
                 if (speed.getModifier(SLOWNESS_MODIFIER_ID) == null) {
                     speed.addTransientModifier(new AttributeModifier(
                             SLOWNESS_MODIFIER_ID,
-                            -0.15,
+                            -0.30,
                             AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL
                     ));
                 }
