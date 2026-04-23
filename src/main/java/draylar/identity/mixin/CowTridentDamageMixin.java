@@ -21,9 +21,14 @@ public abstract class CowTridentDamageMixin {
     private float identity$cowTridentBuff(float damage) {
         Player self = (Player) (Object) this;
         LivingEntity identity = PlayerIdentity.getIdentity(self);
-        if (identity instanceof Cow
-                && self.getMainHandItem().getItem() instanceof TridentItem
-                && (self.isSprinting() || self.isAutoSpinAttack())) {
+        boolean isCow = identity instanceof Cow;
+        boolean holdsTrident = self.getMainHandItem().getItem() instanceof TridentItem;
+        boolean cond = self.isSprinting() || self.isAutoSpinAttack();
+        if (draylar.identity.Identity.LOGGER.isDebugEnabled() && isCow) {
+            draylar.identity.Identity.LOGGER.debug("[Cow attack] holdsTrident={} sprint={} spin={} inDamage={}",
+                    holdsTrident, self.isSprinting(), self.isAutoSpinAttack(), damage);
+        }
+        if (isCow && holdsTrident && cond) {
             return damage * 2.0F;
         }
         return damage;
